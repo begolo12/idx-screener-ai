@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Sparkles, RefreshCw, TrendingUp, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Cpu, HelpCircle, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface TradingScheme {
   id: string;
@@ -95,6 +96,16 @@ interface StrategyLabState {
     lastEvaluationDate: string;
     aiRationale: string;
   };
+  aiLearning?: {
+    isAutonomous: boolean;
+    targetWinRate: number;
+    currentWinRate: number;
+    status: string;
+    whenHold: string;
+    whenRotate: string;
+    schemeMechanism: string;
+    nextEvaluationCriterion: string;
+  };
   openPositions: PaperTrade[];
   tradeHistory: PaperTrade[];
 }
@@ -104,15 +115,8 @@ export function AILabView() {
   const [sectorPicks, setSectorPicks] = useState<SectorPicksGroup[]>([]);
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
-  const [optimizing, setOptimizing] = useState(false);
   const [activeTab, setActiveTab] = useState<"sector-picks" | "positions" | "history" | "schemes">("sector-picks");
-  const [optResult, setOptResult] = useState<{
-    marketIsOpen: boolean;
-    marketMessage: string;
-    newScheme: string;
-    rationale: string;
-    adjustment: string;
-  } | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const loadState = async () => {
     try {
@@ -133,275 +137,290 @@ export function AILabView() {
 
   useEffect(() => {
     loadState();
-    const interval = setInterval(loadState, 30000); // sync live prices every 30s
+    const interval = setInterval(loadState, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  const handleOptimize = async () => {
-    setOptimizing(true);
-    setOptResult(null);
-    try {
-      const res = await fetch("/api/ai-lab", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setOptResult(data.optimization);
-        setState(data.state);
-        if (data.sectorPicks) {
-          setSectorPicks(data.sectorPicks);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to optimize AI scheme:", err);
-    } finally {
-      setOptimizing(false);
-    }
-  };
 
   if (loading || !state) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center space-y-3">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <p className="text-xs text-muted-foreground">Memuat AI Strategy Lab & Data Live TradingView...</p>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        <p className="text-xs text-slate-500 font-medium">Memuat data portofolio & analisa bursa...</p>
       </div>
     );
   }
 
   const { marketStatus, portfolio, activeScheme, openPositions, tradeHistory, availableSchemes } = state;
 
-  const filteredSectors = selectedSectorFilter === "all"
-    ? sectorPicks
-    : sectorPicks.filter(s => s.sectorId === selectedSectorFilter);
+  const filteredSectors =
+    selectedSectorFilter === "all"
+      ? sectorPicks
+      : sectorPicks.filter((s) => s.sectorId === selectedSectorFilter);
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4 pb-28 w-full max-w-md mx-auto">
       {/* Real-time Market Hours Banner */}
       <div
-        className={`rounded-xl border p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 transition-colors ${
+        className={`rounded-2xl border p-3.5 flex items-center justify-between gap-2 transition-colors ${
           marketStatus.isOpen
-            ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-300"
-            : "border-rose-500/30 bg-rose-950/20 text-rose-300"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+            : "border-slate-200 bg-slate-100 text-slate-800"
         }`}
       >
         <div className="flex items-center gap-2.5">
           <span
-            className={`inline-flex h-3 w-3 rounded-full ${
-              marketStatus.isOpen ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
+            className={`inline-flex h-2.5 w-2.5 rounded-full ${
+              marketStatus.isOpen ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
             }`}
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold font-mono tracking-wide uppercase">
+              <span className="text-xs font-bold uppercase tracking-wide">
                 {marketStatus.statusText}
               </span>
-              <span className="text-[11px] opacity-80">({marketStatus.currentWIBTime})</span>
+              <span className="text-[11px] opacity-75 font-mono">({marketStatus.currentWIBTime})</span>
             </div>
-            <p className="text-[11px] opacity-90 mt-0.5">
+            <p className="text-[11px] opacity-85 mt-0.5">
               {marketStatus.sessionText} • {marketStatus.nextOpenText}
             </p>
           </div>
         </div>
 
-        <div className="text-[10px] font-mono rounded bg-background/50 border border-border/50 px-2 py-1 self-start sm:self-auto text-foreground">
-          Jam Perdagangan: Senin - Jumat (09:00 - 15:00 WIB)
+        <div className="text-[10px] font-semibold rounded-lg bg-white/90 border border-slate-200 px-2.5 py-1 text-slate-700 shrink-0">
+          Senin - Jumat
         </div>
       </div>
 
       {/* Portfolio Virtual Capital Card (Rp 5.000.000) */}
-      <div className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-sm">
-        <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-              Modal Virtual Trading
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Saldo Portofolio
+              </span>
+              <button
+                onClick={() => setShowGuide(!showGuide)}
+                className="text-slate-400 hover:text-blue-600 transition p-0.5"
+                aria-label="Petunjuk Portofolio"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-bold font-mono text-foreground">
+              <span className="text-xl font-bold tabular-nums text-slate-900">
                 Rp {portfolio.totalEquity.toLocaleString("id-ID")}
               </span>
               <span
-                className={`text-xs font-bold font-mono ${
-                  portfolio.totalProfitNominal >= 0 ? "text-emerald-400" : "text-rose-400"
+                className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded-md ${
+                  portfolio.totalProfitNominal >= 0
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-rose-50 text-rose-700"
                 }`}
               >
-                {portfolio.totalProfitNominal >= 0 ? "+" : ""}Rp {portfolio.totalProfitNominal.toLocaleString("id-ID")} (
-                {portfolio.totalProfitPct >= 0 ? "+" : ""}
+                {portfolio.totalProfitNominal >= 0 ? "+" : ""}
+                Rp {portfolio.totalProfitNominal.toLocaleString("id-ID")} ({portfolio.totalProfitPct >= 0 ? "+" : ""}
                 {portfolio.totalProfitPct}%)
               </span>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-[10px] text-muted-foreground block font-mono">Modal Pokok</span>
-            <span className="text-xs font-semibold font-mono text-foreground">
+            <span className="text-[10px] text-slate-400 block font-medium">Modal Awal</span>
+            <span className="text-xs font-semibold tabular-nums text-slate-700">
               Rp {portfolio.initialCapital.toLocaleString("id-ID")}
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-          <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block">Sisa Saldo Kas</span>
-            <span className="font-bold text-foreground mt-0.5 block">
+        {/* Breakdown: Saldo Kas vs Dana di Saham */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-0.5">
+            <span className="text-[10px] font-medium text-slate-500 block">Uang Kas Siap Pakai</span>
+            <span className="font-bold tabular-nums text-slate-900 text-sm block">
               Rp {portfolio.cash.toLocaleString("id-ID")}
             </span>
+            <span className="text-[10px] text-slate-400 block">Dana tunai yang belum dibelikan</span>
           </div>
-          <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/40">
-            <span className="text-[10px] text-muted-foreground block">Dana di Saham (Invested)</span>
-            <span className="font-bold text-cyan-400 mt-0.5 block">
+
+          <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-0.5">
+            <span className="text-[10px] font-medium text-slate-500 block">Dana di Saham Aktif</span>
+            <span className="font-bold tabular-nums text-blue-700 text-sm block">
               Rp {portfolio.invested.toLocaleString("id-ID")}
             </span>
+            <span className="text-[10px] text-slate-400 block">Nilai {openPositions.length} saham yang dipegang</span>
           </div>
         </div>
-      </div>
 
-      {/* Top Header Card */}
-      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/5 p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold">
-                Adaptive AI Engine • DeepSeek
-              </span>
-            </div>
-            <h2 className="text-base font-bold text-foreground tracking-tight mt-1">
-              AI Strategy Lab & Bandarmologi Broker
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-              Memadukan indikator teknikal TradingView & profiling broker (waspada scalper MG, prioritaskan Smart Money asing).
-            </p>
+        {/* Beginner Guide Expandable */}
+        {showGuide && (
+          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-slate-700 space-y-1 animate-in fade-in duration-150">
+            <p className="font-bold text-blue-900">Cara Kerja Dompet Simulasi:</p>
+            <p>• Modal simulasi Rp 5.000.000 dialokasikan secara otomatis oleh AI ke 2 saham potensial saat jam bursa.</p>
+            <p>• Jika saham naik mencapai target (+5%), sistem otomatis menjualnya untuk mengunci keuntungan (Take Profit).</p>
+            <p>• Jika saham turun batas rugi (-3%), sistem otomatis menjualnya agar modal tidak tergerus (Stop Loss).</p>
           </div>
-
-          <button
-            onClick={handleOptimize}
-            disabled={optimizing}
-            className="self-start sm:self-auto rounded-lg bg-gradient-to-r from-primary to-cyan-600 px-3.5 py-2 text-xs font-semibold text-white shadow hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-2"
-          >
-            {optimizing ? (
-              <>
-                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>DeepSeek Evaluasi Skema...</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span>Evaluasi & Rotasi Skema AI</span>
-              </>
-            )}
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Scheme Info Card */}
-      <div className="rounded-xl border border-border/80 bg-card p-3.5 space-y-1.5 shadow-sm">
+      {/* AI Strategy Engine Header */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-cyan-400 flex items-center gap-2">
-            Skema Aktif: {activeScheme.name}
-            <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-mono">
-              TARGET +{activeScheme.targetProfitPct}% / SL -{activeScheme.stopLossPct}%
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <Cpu className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                Sistem Analisis Mandiri (AI Self-Learning)
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Strategi: <strong className="text-blue-600 font-bold">{activeScheme.name}</strong> (Untung +{activeScheme.targetProfitPct}% / Pengaman -{activeScheme.stopLossPct}%)
+              </p>
+            </div>
+          </div>
+
+          {/* Autonomous Status Badge (Non-clickable, AI Self-Learning) */}
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+              Otonom (Otomatis)
             </span>
-          </span>
-          <span className="text-[10px] text-muted-foreground font-mono">
-            {openPositions.length} Posisi Aktif
-          </span>
+            <span className="text-[10px] text-slate-500 font-medium tabular-nums">
+              Target Akurasi: <strong className="text-emerald-700 font-bold">95% Winrate</strong>
+            </span>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed italic bg-secondary/20 p-2.5 rounded-lg border border-border/40">
-          &ldquo;{state.metrics.aiRationale}&rdquo;
+
+        {/* Alasan Pemilihan & Status Berjalan */}
+        <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
+          💡 {state.metrics.aiRationale}
         </p>
       </div>
 
-      {/* Optimization Result Alert */}
-      {optResult && (
-        <div
-          className={`rounded-xl border p-3 text-xs space-y-1 ${
-            optResult.marketIsOpen
-              ? "border-cyan-500/30 bg-cyan-950/20 text-cyan-200"
-              : "border-amber-500/30 bg-amber-950/20 text-amber-200"
-          }`}
-        >
-          <div className="font-semibold flex items-center gap-1.5">
-            <span>Hasil Evaluasi DeepSeek:</span>
-            {!optResult.marketIsOpen && (
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
-                PASAR TUTUP
-              </span>
-            )}
+      {/* Penjelasan Lengkap Skema & Logika Pembelajaran Otonom AI */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              Penjelasan Cara Kerja Strategi AI
+            </h3>
           </div>
-          <p className="text-[11px] opacity-90">{optResult.marketMessage}</p>
-          <div className="text-[10px] font-mono text-cyan-400 mt-1">
-            Parameter Rekomendasi: {optResult.adjustment}
+          <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {state.aiLearning?.status || "STRATEGI BERJALAN OPTIMAL"}
+          </span>
+        </div>
+
+        {/* Cara Kerja Skema Aktif */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Strategi Saat Ini:</span>
+            <span className="text-[11px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+              {activeScheme.name}
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
+            {state.aiLearning?.schemeMechanism || activeScheme.description}
+          </p>
+        </div>
+
+        {/* Matriks Keputusan Pembelajaran Mandiri AI */}
+        <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1">
+            <span className="text-[10px] font-bold text-emerald-800 flex items-center gap-1 uppercase tracking-wider">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              Kapan AI Tetap
+            </span>
+            <p className="text-[11px] text-emerald-950 leading-snug">
+              {state.aiLearning?.whenHold || "Tingkat kemenangan konsisten ≥ 75% & pasar mendukung kenaikan harga."}
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
+            <span className="text-[10px] font-bold text-amber-800 flex items-center gap-1 uppercase tracking-wider">
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+              Kapan AI Ganti Strategi
+            </span>
+            <p className="text-[11px] text-amber-950 leading-snug">
+              {state.aiLearning?.whenRotate || "Terjadi 2x rugi berturut-turut atau pola pasar berubah drastis."}
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Navigation Sub-Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-border/80 pb-2">
+        {/* Kriteria Adaptif */}
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+          <span>Target Keberhasilan: <strong className="text-emerald-700 font-bold">95%</strong> (Terkini: {state.metrics.winRate}%)</span>
+          <span className="text-slate-400 font-medium">Evaluasi Real-time</span>
+        </div>
+      </div>
+
+      {/* Navigation Sub-Tabs (Segmented Control yang Ramah Pemula) */}
+      <div className="p-1 bg-slate-100 rounded-xl flex gap-1 text-xs">
         <button
           onClick={() => setActiveTab("sector-picks")}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "sector-picks"
-              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-white text-blue-600 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          <span>⭐</span>
-          <span>Top 5 Tiap Sektor ({sectorPicks.reduce((acc, s) => acc + s.stocks.length, 0)})</span>
+          Rekomendasi
         </button>
         <button
           onClick={() => setActiveTab("positions")}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "positions"
-              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-white text-blue-600 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          Posisi Real Aktif ({openPositions.length})
+          Saham Dimiliki ({openPositions.length})
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "history"
-              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-white text-blue-600 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          Riwayat Trade ({tradeHistory.length})
+          Riwayat ({tradeHistory.length})
         </button>
         <button
           onClick={() => setActiveTab("schemes")}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "schemes"
-              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-white text-blue-600 shadow-xs"
+              : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          3 Skema Kuantitatif
+          Pilihan Strategi
         </button>
       </div>
 
-      {/* Tab 0: Sector Picks (Top 5 per Sektor with Broker Insights) */}
+      {/* Tab 0: Sector Picks (Rekomendasi Pilihan AI per Sektor) */}
       {activeTab === "sector-picks" && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Sector Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
             <button
               onClick={() => setSelectedSectorFilter("all")}
-              className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors ${
+              className={`px-3 py-1 rounded-full whitespace-nowrap transition ${
                 selectedSectorFilter === "all"
-                  ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40"
-                  : "bg-secondary/40 text-muted-foreground hover:text-foreground border border-border/50"
+                  ? "bg-blue-600 text-white font-semibold shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
-              Semua Sektor ({sectorPicks.length})
+              Semua Sektor
             </button>
             {sectorPicks.map((sec) => (
               <button
                 key={sec.sectorId}
                 onClick={() => setSelectedSectorFilter(sec.sectorId)}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 ${
+                className={`px-3 py-1 rounded-full whitespace-nowrap transition flex items-center gap-1 ${
                   selectedSectorFilter === sec.sectorId
-                    ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40"
-                    : "bg-secondary/40 text-muted-foreground hover:text-foreground border border-border/50"
+                    ? "bg-blue-600 text-white font-semibold shadow-xs"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
                 <span>{sec.icon}</span>
@@ -414,20 +433,20 @@ export function AILabView() {
           {filteredSectors.map((group) => (
             <div
               key={group.sectorId}
-              className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-sm"
+              className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs"
             >
-              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
                   <span className="text-base">{group.icon}</span>
-                  <h3 className="text-sm font-bold text-foreground">{group.sectorName}</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{group.sectorName}</h3>
                 </div>
-                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                  {group.stocks.length} Saham Terpilih AI
+                <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                  {group.stocks.length} Pilihan AI
                 </span>
               </div>
 
               {group.stocks.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2 italic">
+                <p className="text-xs text-slate-400 py-2 italic">
                   Belum ada saham yang memenuhi kriteria likuiditas di sektor ini saat ini.
                 </p>
               ) : (
@@ -439,65 +458,68 @@ export function AILabView() {
                     return (
                       <div
                         key={stock.ticker}
-                        className={`rounded-lg border p-3 space-y-2 transition-colors ${
+                        className={`rounded-xl border p-3 space-y-2 transition ${
                           isMg
-                            ? "border-rose-500/40 bg-rose-950/10 hover:border-rose-500/60"
+                            ? "border-rose-200 bg-rose-50/50"
                             : isSmartMoney
-                            ? "border-emerald-500/30 bg-emerald-950/10 hover:border-emerald-500/50"
-                            : "border-border/50 bg-secondary/20 hover:border-cyan-500/40"
+                            ? "border-emerald-200 bg-emerald-50/40"
+                            : "border-slate-200/80 bg-slate-50/50"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-bold text-muted-foreground/60">
-                              #{idx + 1}
-                            </span>
-                            <span className="text-sm font-bold font-mono text-foreground tracking-tight">
-                              {stock.ticker}
-                            </span>
+                            <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
+                            <span className="text-sm font-bold text-slate-900">{stock.ticker}</span>
                             <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
                                 isMg
-                                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  ? "bg-rose-100 text-rose-700"
                                   : stock.action === "STRONG BUY"
-                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                  ? "bg-emerald-100 text-emerald-800 font-bold"
                                   : stock.action === "BUY"
-                                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
-                                  : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                  ? "bg-blue-100 text-blue-700 font-bold"
+                                  : "bg-amber-100 text-amber-800"
                               }`}
                             >
-                              {stock.action}
+                              {stock.action === "STRONG BUY"
+                                ? "SANGAT BAGUS"
+                                : stock.action === "BUY"
+                                ? "BAGUS DIBELI"
+                                : stock.action === "ACCUMULATE"
+                                ? "AKUMULASI"
+                                : "HINDARI (RAWAN GUYUR)"}
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-xs font-bold font-mono text-foreground block">
+                            <span className="text-xs font-bold tabular-nums text-slate-900 block">
                               Rp {stock.price.toLocaleString("id-ID")}
                             </span>
                             <span
-                              className={`text-[10px] font-mono font-semibold ${
-                                stock.changePct >= 0 ? "text-emerald-400" : "text-rose-400"
+                              className={`text-[11px] font-semibold tabular-nums ${
+                                stock.changePct >= 0 ? "text-emerald-700" : "text-rose-700"
                               }`}
                             >
-                              {stock.changePct >= 0 ? "+" : ""}{stock.changePct}%
+                              {stock.changePct >= 0 ? "+" : ""}
+                              {stock.changePct}%
                             </span>
                           </div>
                         </div>
 
-                        {/* Bandarmologi & Broker Info Bar */}
+                        {/* Bandarmologi & Broker Info */}
                         {stock.brokerSummary && (
-                          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] font-mono bg-background/50 px-2.5 py-1.5 rounded border border-border/40">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] bg-white p-2 rounded-lg border border-slate-200/80">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-muted-foreground">Top Buyer:</span>
+                              <span className="text-slate-500">Pembeli Terbanyak:</span>
                               <div className="flex items-center gap-1">
                                 {stock.brokerSummary.topBuyers.map((code) => (
                                   <span
                                     key={code}
-                                    className={`px-1 py-0.2 rounded font-bold ${
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                       code === "MG" || code === "CP"
-                                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                                        ? "bg-rose-100 text-rose-700"
                                         : code === "BK" || code === "AK" || code === "ZP" || code === "KZ"
-                                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                                        : "bg-secondary text-foreground"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-slate-100 text-slate-700"
                                     }`}
                                   >
                                     {code}
@@ -507,31 +529,30 @@ export function AILabView() {
                               </div>
                             </div>
                             <span
-                              className={`font-semibold ${
+                              className={`font-semibold text-[10px] ${
                                 isMg
-                                  ? "text-rose-400"
+                                  ? "text-rose-700"
                                   : isSmartMoney
-                                  ? "text-emerald-400"
-                                  : "text-muted-foreground"
+                                  ? "text-emerald-700"
+                                  : "text-slate-500"
                               }`}
                             >
                               {isMg
-                                ? "⚠️ SCALPER DOMINAN"
+                                ? "Trader Kilat Dominan"
                                 : isSmartMoney
-                                ? "🛡️ SMART MONEY INFLOW"
-                                : "RETAIL FLOW"}
+                                ? "Investor Asing Masuk"
+                                : "Investor Ritel Masuk"}
                             </span>
                           </div>
                         )}
 
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono bg-background/40 px-2.5 py-1.5 rounded">
-                          <span>RSI: <strong className="text-foreground">{stock.rsi}</strong></span>
-                          <span>Transaksi: <strong className="text-foreground">{stock.turnoverFormatted}</strong></span>
-                          <span>Skor TV: <strong className="text-cyan-400">+{stock.recommendationScore}</strong></span>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                          <span>Nilai Transaksi: <strong className="text-slate-800">{stock.turnoverFormatted}</strong></span>
+                          <span>Skor AI: <strong className="text-blue-600">+{stock.recommendationScore}</strong></span>
                         </div>
 
-                        <p className={`text-[11px] leading-snug ${isMg ? "text-rose-300 font-medium" : "text-muted-foreground/90"}`}>
-                          💡 {stock.aiReason}
+                        <p className="text-[11px] text-slate-600 leading-snug px-1">
+                          {stock.aiReason}
                         </p>
                       </div>
                     );
@@ -543,38 +564,49 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 1: Open Positions */}
+      {/* Tab 1: Open Positions (Saham yang Sedang Dimiliki) */}
       {activeTab === "positions" && (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {openPositions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
-              Tidak ada posisi aktif saat ini. AI akan memindai kandidat baru saat bursa buka (Senin-Jumat 09:00 - 15:00 WIB).
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 bg-white space-y-1.5">
+              <p className="font-bold text-slate-700">Belum Ada Saham yang Sedang Dimiliki</p>
+              <p className="leading-relaxed">
+                AI akan secara otomatis membelikan saham terbaik menggunakan modal kas saat jam bursa resmi dibuka (Senin - Jumat 09:00 - 15:00 WIB).
+              </p>
             </div>
           ) : (
             openPositions.map((pos) => (
               <div
                 key={pos.id}
-                className="rounded-xl border border-border/80 bg-card p-3.5 space-y-2.5 hover:border-primary/40 transition-colors shadow-sm"
+                className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs"
               >
+                {/* Header Saham & Untung/Rugi Berjalan */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-foreground font-mono">{pos.ticker}</span>
-                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-mono">
-                      {pos.lots} LOT ({pos.shares} LEMBAR)
+                    <span className="font-bold text-base text-slate-900">{pos.ticker}</span>
+                    <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                      {pos.lots} LOT ({pos.shares.toLocaleString("id-ID")} Lembar)
                     </span>
-                    <span className="text-[10px] text-muted-foreground hidden sm:inline">{pos.name}</span>
                   </div>
                   <div className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {pos.pnlPct >= 0 ? (
+                        <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-rose-600" />
+                      )}
+                      <span
+                        className={`text-sm font-bold tabular-nums ${
+                          pos.pnlPct >= 0 ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        {pos.pnlPct >= 0 ? "+" : ""}
+                        {pos.pnlPct}%
+                      </span>
+                    </div>
                     <span
-                      className={`text-sm font-bold font-mono ${
-                        pos.pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
-                      }`}
-                    >
-                      {pos.pnlPct >= 0 ? "+" : ""}{pos.pnlPct}%
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono block ${
-                        pos.pnlNominal >= 0 ? "text-emerald-400/90" : "text-rose-400/90"
+                      className={`text-[11px] block tabular-nums font-semibold ${
+                        pos.pnlNominal >= 0 ? "text-emerald-600" : "text-rose-600"
                       }`}
                     >
                       {pos.pnlNominal >= 0 ? "+" : ""}Rp {pos.pnlNominal.toLocaleString("id-ID")}
@@ -582,24 +614,45 @@ export function AILabView() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[11px] bg-secondary/30 p-2.5 rounded-lg font-mono">
-                  <div>
-                    <span className="text-muted-foreground text-[10px] block">Modal Beli:</span>
-                    Rp {pos.cost.toLocaleString("id-ID")} (@{pos.entryPrice})
+                {/* Rincian Harga Pembelian & Harga Sekarang */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-slate-400 text-[10px] block font-medium">Modal Pembelian:</span>
+                    <span className="text-slate-800 font-bold block mt-0.5">
+                      Rp {pos.cost.toLocaleString("id-ID")}
+                    </span>
+                    <span className="text-[10px] text-slate-500">(@ Rp {pos.entryPrice.toLocaleString("id-ID")} / lembar)</span>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground text-[10px] block">Nilai Sekarang:</span>
-                    Rp {pos.currentValue.toLocaleString("id-ID")} (@{pos.currentPrice})
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground text-[10px] block">TP / SL:</span>
-                    <span className="text-emerald-400">{pos.targetPrice}</span> /{" "}
-                    <span className="text-rose-400">{pos.stopLossPrice}</span>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-slate-400 text-[10px] block font-medium">Nilai Saat Ini:</span>
+                    <span className="text-slate-800 font-bold block mt-0.5">
+                      Rp {pos.currentValue.toLocaleString("id-ID")}
+                    </span>
+                    <span className="text-[10px] text-slate-500">(@ Rp {pos.currentPrice.toLocaleString("id-ID")} / lembar)</span>
                   </div>
                 </div>
 
-                <p className="text-[11px] text-muted-foreground leading-snug">
-                  {pos.rationale}
+                {/* Target Otomatis Take Profit & Stop Loss */}
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-800 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Target Jual Untung (+5%):
+                    </span>
+                    <strong className="text-emerald-700">Rp {pos.targetPrice.toLocaleString("id-ID")}</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-rose-800 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      Batas Pengaman Rugi (-3%):
+                    </span>
+                    <strong className="text-rose-700">Rp {pos.stopLossPrice.toLocaleString("id-ID")}</strong>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-snug px-1">
+                  💡 {pos.rationale}
                 </p>
               </div>
             ))
@@ -607,101 +660,92 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 2: History & Order Log */}
+      {/* Tab 2: History & Order Log (Riwayat Pembelian & Penjualan) */}
       {activeTab === "history" && (
         <div className="space-y-4">
-          {/* Section: Log Eksekusi Order Beli (Active Orders) */}
+          {/* Active Orders Log */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
-                <span>📥</span> Log Eksekusi Pembelian ({openPositions.length} Order Aktif)
+              <span className="text-xs font-bold text-slate-800">
+                Saham yang Sedang Dipegang ({openPositions.length} Posisi)
               </span>
-              <span className="text-[10px] text-cyan-400 font-mono bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                STATUS: SEDANG DIHOLD
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                STATUS: SEDANG BERJALAN
               </span>
             </div>
             {openPositions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                Belum ada eksekusi order beli aktif.
+              <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 bg-white">
+                Belum ada saham yang sedang dipegang.
               </div>
             ) : (
               openPositions.map((pos) => (
                 <div
                   key={`log-${pos.id}`}
-                  className="rounded-xl border border-border/70 bg-card p-3 space-y-1.5 text-xs shadow-sm"
+                  className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2 text-xs shadow-xs"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground font-mono">{pos.ticker}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500/15 text-emerald-400 font-mono">
-                        BUY {pos.lots} LOT
+                      <span className="font-bold text-slate-900 text-sm">{pos.ticker}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800">
+                        BELI {pos.lots} LOT
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">{pos.entryDate}</span>
+                      <span className="text-[10px] text-slate-400">{pos.entryDate}</span>
                     </div>
-                    <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
-                      HOLD (Target +5% / SL -3%)
+                    <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                      Target +5% / SL -3%
                     </span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground font-mono flex items-center justify-between">
-                    <span>Harga Masuk: <strong>Rp {pos.entryPrice.toLocaleString("id-ID")}</strong></span>
-                    <span>Total Nilai Beli: <strong>Rp {pos.cost.toLocaleString("id-ID")}</strong></span>
-                    <span className="text-[10px] opacity-80">{pos.schemeName}</span>
+                  <div className="text-[11px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-50">
+                    <span>Harga Beli: <strong className="text-slate-800">Rp {pos.entryPrice.toLocaleString("id-ID")}</strong></span>
+                    <span>Total Biaya: <strong className="text-slate-800">Rp {pos.cost.toLocaleString("id-ID")}</strong></span>
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* Section: Closed Trades (Transaksi Selesai) */}
-          <div className="space-y-2 pt-2 border-t border-border/60">
+          {/* Closed Trades */}
+          <div className="space-y-2 pt-2 border-t border-slate-200">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
-                <span>🏁</span> Transaksi Selesai / Closed Trades ({tradeHistory.length})
+              <span className="text-xs font-bold text-slate-800">
+                Transaksi Selesai & Realized Profit ({tradeHistory.length})
               </span>
-              <span className="text-[10px] text-muted-foreground font-mono">
-                Realized PnL
-              </span>
+              <span className="text-[10px] text-slate-400 font-medium">Hasil Penjualan</span>
             </div>
             {tradeHistory.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground space-y-1">
-                <p className="text-[11px]">
-                  {openPositions.length > 0
-                    ? `Posisi ${openPositions.map(p => p.ticker).join(" & ")} saat ini masih aktif berjalan di tab `
-                    : "Posisi virtual saat ini berjalan di tab "}
-                  <strong>Posisi Real Aktif</strong> dan akan otomatis tercatat selesai di sini saat menyentuh{" "}
-                  <strong>Target Profit (+5%)</strong> atau <strong>Stop Loss (-3%)</strong> pada jam bursa.
-                </p>
+              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 bg-white leading-relaxed">
+                Saham yang sedang aktif dipegang ({openPositions.map(p => p.ticker).join(", ") || "posisi terbuka"}) akan otomatis tercatat selesai di sini saat menyentuh <strong>Target Untung (+5%)</strong> atau <strong>Batas Rugi (-3%)</strong> pada jam bursa.
               </div>
             ) : (
               tradeHistory.map((t) => (
                 <div
                   key={t.id}
-                  className="rounded-xl border border-border/60 bg-card p-3 space-y-1.5 text-xs shadow-sm"
+                  className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-1.5 text-xs shadow-xs"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground font-mono">{t.ticker}</span>
+                      <span className="font-bold text-slate-900">{t.ticker}</span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
                           t.status === "CLOSED_TP"
-                            ? "bg-emerald-500/15 text-emerald-400"
-                            : "bg-rose-500/15 text-rose-400"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : "bg-rose-50 text-rose-800"
                         }`}
                       >
-                        {t.status === "CLOSED_TP" ? "TAKE PROFIT" : "STOP LOSS"}
+                        {t.status === "CLOSED_TP" ? "JUAL UNTUNG (+5%)" : "JUAL BATAS RUGI (-3%)"}
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">{t.exitDate}</span>
+                      <span className="text-[10px] text-slate-400">{t.exitDate}</span>
                     </div>
                     <span
-                      className={`font-mono font-bold ${
-                        t.pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
+                      className={`tabular-nums font-bold text-sm ${
+                        t.pnlPct >= 0 ? "text-emerald-700" : "text-rose-700"
                       }`}
                     >
                       {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}% (Rp {t.pnlNominal.toLocaleString("id-ID")})
                     </span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Keluar: Rp {t.exitPrice?.toLocaleString("id-ID")} ({t.schemeName})
+                  <div className="text-[11px] text-slate-500">
+                    Beli {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Dijual: Rp {t.exitPrice?.toLocaleString("id-ID")}
                   </div>
                 </div>
               ))
@@ -710,34 +754,34 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 3: Schemes */}
+      {/* Tab 3: Schemes (Daftar Strategi AI) */}
       {activeTab === "schemes" && (
         <div className="space-y-3">
           {availableSchemes.map((s) => (
             <div
               key={s.id}
-              className={`rounded-xl border p-3.5 space-y-1.5 transition-colors ${
+              className={`rounded-2xl border p-4 space-y-2 transition ${
                 s.id === activeScheme.id
-                  ? "border-cyan-500/50 bg-cyan-950/10 shadow-sm"
-                  : "border-border/60 bg-card"
+                  ? "border-blue-300 bg-blue-50/50 shadow-xs"
+                  : "border-slate-200 bg-white"
               }`}
             >
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
                   {s.name}
                   {s.id === activeScheme.id && (
-                    <span className="text-[9px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded uppercase font-mono">
-                      Aktif Berjalan
+                    <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md font-bold">
+                      Sedang Aktif Dipakai
                     </span>
                   )}
                 </h4>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  TP +{s.targetProfitPct}% / SL -{s.stopLossPct}%
+                <span className="text-[11px] font-bold text-slate-700">
+                  Target Untung +{s.targetProfitPct}% / Pengaman -{s.stopLossPct}%
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">{s.description}</p>
-              <div className="text-[11px] font-mono text-cyan-300/90 bg-secondary/40 p-2 rounded border border-border/40">
-                Rule: {s.rule}
+              <p className="text-xs text-slate-600 leading-relaxed">{s.description}</p>
+              <div className="text-[11px] text-blue-900 bg-blue-50 p-2.5 rounded-xl border border-blue-100">
+                <strong>Aturan Logika:</strong> {s.rule}
               </div>
             </div>
           ))}

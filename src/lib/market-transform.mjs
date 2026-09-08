@@ -18,6 +18,9 @@ export function filterAndSortStocks(stocks, options = {}) {
     case 'volume':
       result.sort((a, b) => b.volume - a.volume);
       break;
+    case 'turnover':
+      result.sort((a, b) => (b.turnoverVal || 0) - (a.turnoverVal || 0));
+      break;
     default:
       break;
   }

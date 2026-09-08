@@ -226,7 +226,14 @@ export async function getStockQuote(ticker: string) {
           "sector",
           "open",
           "high",
-          "low"
+          "low",
+          "RSI",
+          "Recommend.All",
+          "price_52_week_high",
+          "price_52_week_low",
+          "market_cap_basic",
+          "price_earnings_ttm",
+          "price_book_ratio",
         ],
       }),
     });
@@ -234,18 +241,76 @@ export async function getStockQuote(ticker: string) {
     const json = await res.json();
     const row = json?.data?.[0]?.d;
 
+    // Fetch news specific to ticker and filter maximum 7 days ago
     let relatedNews: any[] = [];
     try {
-      const zNews: any = await zpi.run("finance:idxchannel", "related", { code: symbol }).catch(() => []);
-      relatedNews = Array.isArray(zNews) ? zNews : zNews?.data ?? [];
+      const zNews: any = await zpi.run("finance:idxchannel", "search", { q: symbol }).catch(() => null);
+      const items = Array.isArray(zNews?.items) ? zNews.items : [];
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+      relatedNews = items
+        .filter((item: any) => {
+          if (!item?.publishedAt) return false;
+          const pubTime = new Date(item.publishedAt).getTime();
+          return !isNaN(pubTime) && pubTime >= sevenDaysAgo;
+        })
+        .map((item: any) => {
+          const pubDate = new Date(item.publishedAt);
+          const timeFormatted = isNaN(pubDate.getTime())
+            ? "Terkini"
+            : pubDate.toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+
+          return {
+            title: item.title,
+            url: item.url || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`,
+            source: item.source || "IDX Channel",
+            time: timeFormatted,
+            publishedAt: item.publishedAt,
+          };
+        });
     } catch {}
 
     if (row) {
-      const price = Number(row[2]);
+      const price = Number(row[2] || 0);
+      const changePct = Number(row[3] || 0);
+      const volume = Number(row[4] || 0);
       const turnoverNum = Number(row[5] || 0);
-      const turnover = turnoverNum >= 1_000_000_000
+      const open = Number(row[7] || price);
+      const high = Number(row[8] || price);
+      const low = Number(row[9] || price);
+      const rsi = row[10] !== null && row[10] !== undefined ? Number(Number(row[10]).toFixed(1)) : null;
+      const recAll = Number(row[11] || 0);
+      const week52High = Number(row[12] || high);
+      const week52Low = Number(row[13] || low);
+      const marketCapNum = Number(row[14] || 0);
+      const per = row[15] !== null && row[15] !== undefined ? Number(Number(row[15]).toFixed(1)) : null;
+      const pbv = row[16] !== null && row[16] !== undefined ? Number(Number(row[16]).toFixed(2)) : null;
+
+      const turnover = turnoverNum >= 1_000_000_000_000
+        ? `${(turnoverNum / 1_000_000_000_000).toFixed(1)} Triliun`
+        : turnoverNum >= 1_000_000_000
         ? `${(turnoverNum / 1_000_000_000).toFixed(1)} Miliar`
         : `${(turnoverNum / 1_000_000).toFixed(0)} Juta`;
+
+      const marketCap = marketCapNum >= 1_000_000_000_000
+        ? `${(marketCapNum / 1_000_000_000_000).toFixed(1)} T`
+        : marketCapNum >= 1_000_000_000
+        ? `${(marketCapNum / 1_000_000_000).toFixed(1)} M`
+        : "-";
+
+      let techRecommendation = "Netral";
+      if (recAll >= 0.5) techRecommendation = "Strong Buy";
+      else if (recAll >= 0.1) techRecommendation = "Buy";
+      else if (recAll <= -0.5) techRecommendation = "Strong Sell";
+      else if (recAll <= -0.1) techRecommendation = "Sell";
+
+      // Nominal change rupiah
+      const nominalChange = open > 0 ? price - open : Math.round(price * (changePct / 100));
 
       return {
         ticker: symbol,
@@ -253,21 +318,24 @@ export async function getStockQuote(ticker: string) {
         sector: mapSector(String(row[6] || "")),
         quote: {
           price,
-          open: Number(row[7] || price),
-          high: Number(row[8] || price),
-          low: Number(row[9] || price),
-          previous: Number(row[7] || price),
-          volume: Number(row[4] || 0),
+          changePct: Number(changePct.toFixed(2)),
+          nominalChange,
+          open,
+          high,
+          low,
+          previous: open,
+          volume,
           turnover,
+          turnoverNum,
+          rsi,
+          techRecommendation,
+          week52High,
+          week52Low,
+          marketCap,
+          per,
+          pbv,
         },
-        news: relatedNews.length > 0 ? relatedNews : [
-          {
-            title: `Kinerja Pasar & Ringkasan Perdagangan ${symbol}`,
-            source: "TradingView Market",
-            time: "Live",
-            url: `https://www.tradingview.com/symbols/IDX-${symbol}/`,
-          }
-        ],
+        news: relatedNews,
       };
     }
   } catch (err) {
@@ -280,12 +348,22 @@ export async function getStockQuote(ticker: string) {
     sector: "Keuangan",
     quote: {
       price: 5000,
-      open: 4950,
-      high: 5100,
-      low: 4920,
-      previous: 4940,
-      volume: 45000000,
-      turnover: "225.0 Miliar",
+      changePct: 0.0,
+      nominalChange: 0,
+      open: 5000,
+      high: 5000,
+      low: 5000,
+      previous: 5000,
+      volume: 100000,
+      turnover: "500 Juta",
+      turnoverNum: 500000000,
+      rsi: 50,
+      techRecommendation: "Netral",
+      week52High: 6000,
+      week52Low: 4500,
+      marketCap: "5.0 T",
+      per: 12.5,
+      pbv: 1.8,
     },
     news: [],
   };

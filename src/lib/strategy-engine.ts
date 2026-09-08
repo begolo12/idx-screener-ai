@@ -65,6 +65,16 @@ export interface StrategyLabState {
     lastEvaluationDate: string;
     aiRationale: string;
   };
+  aiLearning: {
+    isAutonomous: boolean;
+    targetWinRate: number;
+    currentWinRate: number;
+    status: string;
+    whenHold: string;
+    whenRotate: string;
+    schemeMechanism: string;
+    nextEvaluationCriterion: string;
+  };
   openPositions: PaperTrade[];
   tradeHistory: PaperTrade[];
 }
@@ -192,10 +202,11 @@ let globalState: {
 };
 
 let isInitialized = false;
+let lastDrawdownRotatedTradeId = "";
 
 // Initialize positions with real TradingView data fitting Rp 5.000.000 budget
 async function initRealPositionsIfEmpty() {
-  if (isInitialized && globalState.openPositions.length > 0) return;
+  if (isInitialized) return;
   try {
     const liveStocks = await getTechnicalStocks(25);
     // Find top 2 real stocks from TradingView
@@ -217,8 +228,8 @@ async function initRealPositionsIfEmpty() {
 
         if (availableCash >= cost) {
           availableCash -= cost;
-          const tp = Math.round(s.price * 1.05);
-          const sl = Math.round(s.price * 0.97);
+          const tp = Math.round(s.price * (1 + globalState.activeScheme.targetProfitPct / 100));
+          const sl = Math.round(s.price * (1 - globalState.activeScheme.stopLossPct / 100));
 
           initialPositions.push({
             id: `live-pos-${s.ticker}-${i}`,
@@ -340,6 +351,52 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
   const winRate = total > 0 ? Number(((wins / total) * 100).toFixed(1)) : 0;
   const cumulativePnlPct = Number(closed.reduce((acc, t) => acc + t.pnlPct, 0).toFixed(2));
 
+  // Autonomous self-learning rotation rules
+  const targetWinRate = 95.0;
+  let learningStatus = "MEMPERTAHANKAN SKEMA";
+  let autoRotateReason = "";
+
+  // Criterion 1: Drawdown rule - 2 consecutive Stop Losses on closed trades
+  const lastTwoClosed = closed.slice(0, 2);
+  const isDrawdownTriggered =
+    lastTwoClosed.length >= 2 &&
+    lastTwoClosed.every(t => t.status === "CLOSED_SL" || t.pnlPct < 0) &&
+    lastTwoClosed[0].id !== lastDrawdownRotatedTradeId;
+
+  if (isDrawdownTriggered) {
+    lastDrawdownRotatedTradeId = lastTwoClosed[0].id;
+    const nextSchemeId = globalState.activeScheme.id === "breakout" ? "trend" : globalState.activeScheme.id === "trend" ? "mean_reversion" : "breakout";
+    const nextScheme = SCHEMES.find(s => s.id === nextSchemeId) || SCHEMES[0];
+    globalState.activeScheme = nextScheme;
+    globalState.lastEvaluationDate = new Date().toLocaleDateString("id-ID");
+    learningStatus = "ROTASI OTOMATIS TERPICU";
+    autoRotateReason = `Drawdown 2x Stop Loss terdeteksi. AI otomatis merotasi skema ke ${nextScheme.name} untuk memulihkan akurasi menuju target ${targetWinRate}%.`;
+    globalState.aiRationale = autoRotateReason;
+  } else if (winRate >= 75 && total >= 3) {
+    learningStatus = "SKEMA SANGAT OPTIMAL (HOLD)";
+    autoRotateReason = `Akurasi skema sangat kuat (Winrate ${winRate}%). AI mempertahankan ${globalState.activeScheme.name} untuk mengakumulasi profit menuju target akurasi ${targetWinRate}%.`;
+  } else {
+    learningStatus = "SKEMA AKTIF (ADAPTIF)";
+    autoRotateReason = `AI mempertahankan ${globalState.activeScheme.name}. Memantau dinamika volume dan level teknikal untuk mengejar target winrate ${targetWinRate}%.`;
+  }
+
+  const schemeMechanisms: Record<string, string> = {
+    breakout: "Mendeteksi volume transaksi > 2x rata-rata 20 hari saat harga menembus resistance dengan RSI 55-72. TP dipasang di +5%, SL ketat di -3%. Skema ini optimal saat pasar bergerak dalam momentum apresiasi cepat.",
+    trend: "Mengidentifikasi emiten berkapitalisasi solid di atas EMA50 yang mengalami pullback sehat ke support EMA20. TP di +6%, SL di -2.5%. Sangat efektif di pasar trending teratur.",
+    mean_reversion: "Membeli saham di zona jenuh jual (RSI < 38) dengan konfirmasi pantulan teknikal. TP di +4%, SL di -2.5%. Dirancang untuk pasar sideways atau fase pemulihan setelah koreksi tajam.",
+  };
+
+  const aiLearning = {
+    isAutonomous: true,
+    targetWinRate,
+    currentWinRate: winRate,
+    status: learningStatus,
+    whenHold: "Winrate konsisten ≥ 75% & pasar sejalan dengan setup teknikal skema.",
+    whenRotate: "Terjadi 2x Stop Loss berturut-turut atau volatilitas pasar menuntut rotasi regim.",
+    schemeMechanism: schemeMechanisms[globalState.activeScheme.id] || globalState.activeScheme.description,
+    nextEvaluationCriterion: "Evaluasi otonom berjalan tiap penutupan posisi (TP/SL) dan pembukaan sesi bursa.",
+  };
+
   return {
     marketStatus,
     portfolio: {
@@ -359,8 +416,9 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
       winRate,
       cumulativePnlPct,
       lastEvaluationDate: globalState.lastEvaluationDate,
-      aiRationale: globalState.aiRationale,
+      aiRationale: autoRotateReason || globalState.aiRationale,
     },
+    aiLearning,
     openPositions: globalState.openPositions,
     tradeHistory: globalState.tradeHistory,
   };
