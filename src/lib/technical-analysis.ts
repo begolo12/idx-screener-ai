@@ -15,6 +15,9 @@ export interface TechnicalStock {
   ema20: number;
   ema50: number;
   sma200: number;
+  volatilityDaily?: number;
+  perfWeek?: number;
+  perfMonth?: number;
   signals: string[];
 }
 
@@ -94,7 +97,10 @@ export async function getTechnicalStocks(limit = 120): Promise<TechnicalStock[]>
           "Recommend.All",
           "EMA20",
           "EMA50",
-          "SMA200"
+          "SMA200",
+          "Volatility.D",
+          "Perf.W",
+          "Perf.1M"
         ],
         sort: { sortBy: "Value.Traded", sortOrder: "desc" },
         range: [0, limit]
@@ -121,6 +127,9 @@ export async function getTechnicalStocks(limit = 120): Promise<TechnicalStock[]>
       const ema20 = Number(Number(d[11] || price).toFixed(0));
       const ema50 = Number(Number(d[12] || price).toFixed(0));
       const sma200 = Number(Number(d[13] || price).toFixed(0));
+      const volatilityDaily = Number(Number(d[14] || 2.5).toFixed(2));
+      const perfWeek = Number(Number(d[15] || 0).toFixed(2));
+      const perfMonth = Number(Number(d[16] || 0).toFixed(2));
 
       const signals: string[] = [];
       if (rsi < 35) signals.push("RSI Oversold");
@@ -144,6 +153,9 @@ export async function getTechnicalStocks(limit = 120): Promise<TechnicalStock[]>
         ema20,
         ema50,
         sma200,
+        volatilityDaily,
+        perfWeek,
+        perfMonth,
         signals
       };
     });

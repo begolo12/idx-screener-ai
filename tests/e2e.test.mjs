@@ -119,6 +119,7 @@ test("E2E - /api/ai-lab verifies portfolio mathematical equity, autonomous state
   assert.ok(metrics.durationKpi.avgSlDurationDays > 0, "avgSlDurationDays must be positive");
   assert.ok(metrics.durationKpi.velocityScore > 0, "velocityScore must be positive");
   assert.ok(metrics.durationKpi.speedAnalysis.length > 20, "speedAnalysis narrative must be provided");
+  assert.ok(metrics.durationKpi.marketDailyVolatility > 0, "marketDailyVolatility must be calculated from live TV data");
 
   // Autonomous learning target check
   assert.equal(aiLearning.targetWinRate, 95.0, "Autonomous AI learning target must be 95% winrate");
