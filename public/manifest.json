@@ -1,0 +1,17 @@
+{
+  "name": "IDX Stock Screener & News",
+  "short_name": "IDX Screener",
+  "description": "Screener Saham BEI dan Berita Finansial Terkini",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090e",
+  "theme_color": "#07090e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
