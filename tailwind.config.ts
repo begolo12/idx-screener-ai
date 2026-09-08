@@ -10,13 +10,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#07090e",
-        surface: "#0f131d",
-        "surface-elevated": "#181e2e",
-        border: "#232a3f",
-        bull: "#10b981",
-        bear: "#ef4444",
-        accent: "#38bdf8",
+        background: "#f8fafc",
+        surface: "#ffffff",
+        "surface-elevated": "#f1f5f9",
+        border: "#e2e8f0",
+        bull: "#006947",
+        bear: "#dc2626",
+        accent: "#0058be",
       },
       fontFamily: {
         mono: [

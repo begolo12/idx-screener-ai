@@ -11,12 +11,12 @@ export function Badge({ children, variant = "neutral", className }: BadgeProps) 
   return (
     <span
       className={clsx(
-        "inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold tabular-nums leading-none tracking-tight",
+        "inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums leading-none tracking-tight",
         {
-          "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30": variant === "bull",
-          "bg-rose-500/15 text-rose-400 border border-rose-500/30": variant === "bear",
-          "bg-sky-500/15 text-sky-400 border border-sky-500/30": variant === "accent",
-          "bg-surface-elevated text-slate-300 border border-border": variant === "neutral",
+          "bg-emerald-50 text-emerald-700 border border-emerald-200": variant === "bull",
+          "bg-rose-50 text-rose-700 border border-rose-200": variant === "bear",
+          "bg-blue-50 text-blue-700 border border-blue-200": variant === "accent",
+          "bg-slate-100 text-slate-700 border border-slate-200": variant === "neutral",
         },
         className
       )}

@@ -36,3 +36,17 @@ test('filterAndSortStocks filters by price range', () => {
   assert.equal(filtered.length, 1);
   assert.equal(filtered[0].ticker, 'BBRI');
 });
+
+test('filterAndSortStocks sorts top turnover correctly', () => {
+  const mockStocks = [
+    { ticker: 'BBCA', price: 10000, changePct: 1.5, volume: 5000000, turnoverVal: 50000000000 },
+    { ticker: 'BBRI', price: 5000, changePct: 3.2, volume: 12000000, turnoverVal: 60000000000 },
+    { ticker: 'GOTO', price: 50, changePct: -2.0, volume: 80000000, turnoverVal: 4000000000 },
+  ];
+
+  const sorted = filterAndSortStocks(mockStocks, { sort: 'turnover' });
+  assert.equal(sorted[0].ticker, 'BBRI');
+  assert.equal(sorted[1].ticker, 'BBCA');
+  assert.equal(sorted[2].ticker, 'GOTO');
+});
+

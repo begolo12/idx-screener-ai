@@ -1,49 +1,58 @@
 "use client";
 
 import React from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, TrendingUp, TrendingDown, BarChart2, DollarSign } from "lucide-react";
 
 interface FilterChipsProps {
   activeSort: string;
   onSelectSort: (sort: string) => void;
   onOpenDrawer: () => void;
   hasCustomFilter: boolean;
+  totalCount?: number;
 }
 
-export function FilterChips({ activeSort, onSelectSort, onOpenDrawer, hasCustomFilter }: FilterChipsProps) {
+export function FilterChips({
+  activeSort,
+  onSelectSort,
+  onOpenDrawer,
+  hasCustomFilter,
+}: FilterChipsProps) {
   const chips = [
-    { id: "gainers", label: "Top Gainers" },
-    { id: "losers", label: "Top Losers" },
-    { id: "volume", label: "Top Volume" },
+    { id: "gainers", label: "Top Gainers", icon: TrendingUp, activeColor: "bg-emerald-600 text-white" },
+    { id: "losers", label: "Top Losers", icon: TrendingDown, activeColor: "bg-rose-600 text-white" },
+    { id: "volume", label: "Top Volume", icon: BarChart2, activeColor: "bg-blue-600 text-white" },
+    { id: "turnover", label: "Top Nilai", icon: DollarSign, activeColor: "bg-indigo-600 text-white" },
   ];
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 bg-background no-scrollbar border-b border-border/40">
+    <div className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 bg-white no-scrollbar border-b border-slate-200 sticky top-0 z-10">
       <button
         onClick={onOpenDrawer}
-        className={`flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl border text-xs font-medium transition active:scale-95 shrink-0 ${
+        className={`flex items-center gap-1.5 px-3 min-h-[34px] rounded-full border text-xs font-semibold transition active:scale-95 shrink-0 ${
           hasCustomFilter
-            ? "border-sky-500 bg-sky-500/15 text-sky-300"
-            : "border-border bg-surface text-slate-300 hover:border-slate-600"
+            ? "border-blue-600 bg-blue-50 text-blue-700 font-bold"
+            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
         }`}
       >
-        <SlidersHorizontal className="w-4 h-4 text-sky-400" />
-        <span>Filter {hasCustomFilter ? "(Aktif)" : ""}</span>
+        <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
+        <span>Filter {hasCustomFilter ? "• Aktif" : ""}</span>
       </button>
 
       {chips.map((c) => {
         const isActive = activeSort === c.id;
+        const Icon = c.icon;
         return (
           <button
             key={c.id}
             onClick={() => onSelectSort(c.id)}
-            className={`px-4 min-h-[44px] rounded-xl text-xs font-semibold shrink-0 transition-colors ${
+            className={`flex items-center gap-1.5 px-3.5 min-h-[34px] rounded-full text-xs font-semibold shrink-0 transition-colors ${
               isActive
-                ? "bg-sky-500 text-white shadow-sm shadow-sky-500/25"
-                : "bg-surface border border-border text-slate-300 hover:border-slate-600"
+                ? `${c.activeColor} shadow-xs`
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            {c.label}
+            <Icon className="w-3.5 h-3.5" />
+            <span>{c.label}</span>
           </button>
         );
       })}

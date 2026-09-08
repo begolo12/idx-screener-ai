@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Send, Newspaper, CheckCircle2, Clock, RotateCcw, Sparkles } from "lucide-react";
 
 interface AnalysisReport {
   session: "morning" | "closing";
@@ -50,7 +51,6 @@ export function AnalysisDashboard() {
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date();
-      // WIB is UTC+7
       const utc = now.getTime() + now.getTimezoneOffset() * 60000;
       const wib = new Date(utc + 7 * 3600000);
 
@@ -94,7 +94,7 @@ export function AnalysisDashboard() {
     localStorage.setItem("idx_discord_webhook", webhookUrl.trim());
     localStorage.setItem("idx_koran_webhook", koranWebhookUrl.trim());
     setIsSaved(true);
-    setTestResult({ success: true, message: "Webhook URL berhasil disimpan di browser." });
+    setTestResult({ success: true, message: "Webhook URL berhasil disimpan di peramban." });
     setTimeout(() => setTestResult(null), 3000);
   };
 
@@ -184,49 +184,45 @@ export function AnalysisDashboard() {
   };
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4 pb-28 w-full max-w-md mx-auto">
       {/* Header Info Banner */}
-      <div className="relative overflow-hidden rounded-xl border border-border/80 bg-gradient-to-br from-card to-secondary/30 p-4 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <h2 className="text-base font-bold text-foreground tracking-tight">
-                Otomatisasi Analisa Pasar & Discord
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                Otomatisasi Laporan Pasar & Discord
               </h2>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Jadwal harian pukul 10:00 WIB (Sesi 1) & 15:00 WIB (Sesi 2 penutupan).
-            </p>
+            <div className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+              <Clock className="w-3 h-3 text-slate-500" />
+              <span>{countdown || "Menghitung..."}</span>
+            </div>
           </div>
-          <div className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-xs font-mono font-medium text-emerald-400">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {countdown || "Menghitung jadwal..."}
-          </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Terjadwal otomatis tiap sesi bursa: 10:00 WIB (Sesi 1) & 15:00 WIB (Penutupan).
+          </p>
         </div>
       </div>
 
       {/* Discord Webhook Setup Card (Analisa Pasar) */}
-      <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#5865F2]/20 text-[#5865F2]">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-              </svg>
+            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+              DC
             </div>
-            <h3 className="text-sm font-semibold text-foreground">Webhook Laporan Analisa (Jam 10 & 15)</h3>
+            <h3 className="text-xs font-bold text-slate-900">Webhook Laporan Analisa</h3>
           </div>
           {isSaved && (
-            <span className="text-[11px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
               Tersimpan
             </span>
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="space-y-2">
           <input
             type="text"
             value={webhookUrl}
@@ -235,24 +231,27 @@ export function AnalysisDashboard() {
               setIsSaved(false);
             }}
             placeholder="https://discord.com/api/webhooks/..."
-            className="flex-1 rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none transition"
           />
           <div className="flex gap-2">
             <button
               onClick={handleSaveWebhook}
-              className="rounded-lg bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition"
             >
               Simpan
             </button>
             <button
               onClick={handleTestWebhook}
               disabled={testingWebhook || !webhookUrl}
-              className="rounded-lg bg-[#5865F2] px-3 py-2 text-xs font-medium text-white hover:bg-[#4752C4] disabled:opacity-50 transition-colors flex items-center gap-1.5"
+              className="flex-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5"
             >
               {testingWebhook ? (
                 <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
-                "Tes Ping"
+                <>
+                  <Send className="w-3 h-3" />
+                  <span>Tes Ping</span>
+                </>
               )}
             </button>
           </div>
@@ -260,10 +259,10 @@ export function AnalysisDashboard() {
 
         {testResult && (
           <div
-            className={`text-xs p-2.5 rounded-lg border ${
+            className={`text-xs p-2.5 rounded-xl border ${
               testResult.success
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800 font-medium"
+                : "bg-rose-50 border-rose-200 text-rose-800"
             }`}
           >
             {testResult.message}
@@ -272,34 +271,33 @@ export function AnalysisDashboard() {
       </div>
 
       {/* Koran Harian Saham Webhook Setup Card */}
-      <div className="rounded-xl border border-sky-500/30 bg-gradient-to-br from-card to-sky-950/10 p-4 space-y-3 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">📰</span>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Newspaper className="w-4 h-4" />
+            </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Koran Harian Pasar Modal IDX</h3>
-              <p className="text-[11px] text-muted-foreground">
-                Ringkasan berita harian paling berpengaruh, aksi emiten, kurs, dan komoditas.
+              <h3 className="text-xs font-bold text-slate-900">Koran Harian Pasar Modal</h3>
+              <p className="text-[11px] text-slate-500">
+                Berita utama pasar, kurs rupiah, komoditas, dan aksi korporasi.
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-mono font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
-            KORAN HARIAN
-          </span>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="space-y-2">
           <input
             type="text"
             value={koranWebhookUrl}
             onChange={(e) => setKoranWebhookUrl(e.target.value)}
             placeholder="URL Webhook Koran Discord..."
-            className="flex-1 rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none transition"
           />
           <button
             onClick={handlePublishKoran}
             disabled={publishingKoran}
-            className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+            className="w-full rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow-xs"
           >
             {publishingKoran ? (
               <>
@@ -308,8 +306,8 @@ export function AnalysisDashboard() {
               </>
             ) : (
               <>
-                <span>📰</span>
-                <span>Terbitkan Koran Sekarang</span>
+                <Newspaper className="w-3.5 h-3.5" />
+                <span>Terbitkan Koran Harian Sekarang</span>
               </>
             )}
           </button>
@@ -317,10 +315,10 @@ export function AnalysisDashboard() {
 
         {koranResult && (
           <div
-            className={`text-xs p-2.5 rounded-lg border ${
+            className={`text-xs p-2.5 rounded-xl border ${
               koranResult.success
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800 font-medium"
+                : "bg-rose-50 border-rose-200 text-rose-800"
             }`}
           >
             {koranResult.message}
@@ -329,26 +327,26 @@ export function AnalysisDashboard() {
       </div>
 
       {/* Manual Trigger & Session Selector */}
-      <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3 shadow-sm">
-        <h3 className="text-sm font-semibold text-foreground">Kirim Laporan Analisa 6 Sektor (On-Demand)</h3>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-lg bg-secondary/50 p-1 border border-border">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+        <h3 className="text-xs font-bold text-slate-900">Kirim Laporan Analisa 6 Sektor (On-Demand)</h3>
+        <div className="space-y-2.5">
+          <div className="p-1 bg-slate-100 rounded-xl flex gap-1 text-xs">
             <button
               onClick={() => setSelectedSession("morning")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition ${
                 selectedSession === "morning"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Sesi 1 (10:00 WIB)
             </button>
             <button
               onClick={() => setSelectedSession("closing")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition ${
                 selectedSession === "closing"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Sesi 2 (15:00 WIB)
@@ -358,7 +356,7 @@ export function AnalysisDashboard() {
           <button
             onClick={handleGenerateReport}
             disabled={generatingReport}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
+            className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5 shadow-xs"
           >
             {generatingReport ? (
               <>
@@ -367,9 +365,7 @@ export function AnalysisDashboard() {
               </>
             ) : (
               <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+                <Sparkles className="w-3.5 h-3.5" />
                 <span>Generate & Kirim Laporan Lengkap</span>
               </>
             )}
@@ -379,40 +375,40 @@ export function AnalysisDashboard() {
 
       {/* Live Generated Report Preview */}
       {report && (
-        <div className="rounded-xl border border-emerald-500/30 bg-card p-4 space-y-3 shadow-md">
-          <div className="flex items-center justify-between border-b border-border pb-2.5">
+        <div className="rounded-2xl border border-emerald-200 bg-white p-4 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                {report.session === "morning" ? "Laporan Pagi (10:00 WIB)" : "Laporan Penutupan (15:00 WIB)"}
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
+                {report.session === "morning" ? "Laporan Sesi 1 (10:00 WIB)" : "Laporan Penutupan (15:00 WIB)"}
               </span>
-              <h4 className="text-sm font-bold text-foreground mt-1">
+              <h4 className="text-sm font-bold text-slate-900 mt-1">
                 IHSG {report.ihsg.value} ({report.ihsg.change} / {report.ihsg.changePct})
               </h4>
             </div>
-            <div className="text-right text-[11px] text-muted-foreground font-mono">
+            <div className="text-right text-[11px] text-slate-400 font-mono">
               Terbit: {report.generatedAt} WIB
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/50">
-              <span className="text-[11px] text-muted-foreground">Arus Dana Asing:</span>
-              <p className="font-semibold text-foreground mt-0.5">{report.foreignFlow}</p>
+            <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+              <span className="text-[10px] text-slate-500 block">Arus Dana Asing:</span>
+              <p className="font-semibold text-slate-900 mt-0.5">{report.foreignFlow}</p>
             </div>
-            <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/50">
-              <span className="text-[11px] text-muted-foreground">AI Strategy Lab:</span>
-              <p className="font-semibold text-emerald-400 mt-0.5">{report.activeScheme} ({report.winRate}% Win)</p>
+            <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+              <span className="text-[10px] text-slate-500 block">AI Strategy Lab:</span>
+              <p className="font-semibold text-blue-700 mt-0.5">{report.activeScheme} ({report.winRate}% Win)</p>
             </div>
           </div>
 
-          <div className="rounded-lg bg-secondary/20 p-3.5 border border-border/40 text-xs leading-relaxed text-foreground whitespace-pre-line font-sans max-h-96 overflow-y-auto">
+          <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-100 text-xs leading-relaxed text-slate-800 whitespace-pre-line max-h-96 overflow-y-auto">
             {report.aiAnalysis}
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
-            <span>Status Pengiriman Discord:</span>
-            <span className={report.discordDispatched ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
-              {report.discordDispatched ? "✓ Berhasil Terkirim ke Webhook (3 Embed Rinci)" : "Gagal kirim: " + (report.discordError || "periksa webhook")}
+          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+            <span>Status Discord:</span>
+            <span className={report.discordDispatched ? "text-emerald-700 font-medium" : "text-amber-700 font-medium"}>
+              {report.discordDispatched ? "✓ Berhasil Terkirim ke Webhook" : "Gagal kirim: " + (report.discordError || "periksa webhook")}
             </span>
           </div>
         </div>

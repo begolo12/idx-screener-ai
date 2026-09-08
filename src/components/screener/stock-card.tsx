@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Badge } from "@/components/ui/badge";
 import { Sparkline } from "@/components/ui/sparkline";
 import { Star } from "lucide-react";
 
@@ -12,7 +11,11 @@ interface StockCardProps {
     price: number;
     changePct: number;
     volume: number;
+    turnoverVal?: number;
     sector?: string;
+    open?: number;
+    high?: number;
+    low?: number;
     sparkline?: number[];
   };
   isWatchlisted: boolean;
@@ -24,56 +27,128 @@ export function StockCard({ stock, isWatchlisted, onToggleWatchlist, onClick }: 
   const isUp = stock.changePct > 0;
   const isDown = stock.changePct < 0;
 
+  // Format turnover
+  const formatTurnover = (val?: number) => {
+    if (!val || val === 0) return null;
+    if (val >= 1_000_000_000_000) return `Rp ${(val / 1_000_000_000_000).toFixed(1)} T`;
+    if (val >= 1_000_000_000) return `Rp ${(val / 1_000_000_000).toFixed(1)} M`;
+    if (val >= 1_000_000) return `Rp ${(val / 1_000_000).toFixed(0)} Jt`;
+    return `Rp ${val.toLocaleString("id-ID")}`;
+  };
+
+  // Format volume (shares to lots)
+  const formatVolume = (vol: number) => {
+    if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(1)}B`;
+    if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(1)}M`;
+    if (vol >= 1_000) return `${(vol / 1_000).toFixed(0)}K`;
+    return vol.toLocaleString("id-ID");
+  };
+
+  // Calculate nominal change
+  const nominalChange = stock.open && stock.open > 0
+    ? stock.price - stock.open
+    : Math.round(stock.price * (stock.changePct / 100));
+
+  // Range position calculation (0 to 100%)
+  const hasRange = stock.low !== undefined && stock.high !== undefined && stock.high > stock.low;
+  const rangePct = hasRange
+    ? Math.min(Math.max(((stock.price - stock.low!) / (stock.high! - stock.low!)) * 100, 0), 100)
+    : 50;
+
+  const turnoverStr = formatTurnover(stock.turnoverVal);
+
   return (
     <div
       onClick={() => onClick(stock.ticker)}
-      className="p-3.5 bg-surface rounded-xl border border-border hover:border-slate-600 transition duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-between gap-2"
+      className="p-3.5 bg-white rounded-2xl border border-slate-200/90 hover:border-blue-400 hover:shadow-xs transition duration-150 active:scale-[0.99] cursor-pointer space-y-2.5"
     >
-      {/* Ticker & Metadata */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-base tracking-tight text-slate-100">{stock.ticker}</span>
-          {stock.sector && (
-            <span className="text-[10px] text-slate-400 bg-surface-elevated px-1.5 py-0.5 rounded border border-border/50">
-              {stock.sector}
-            </span>
+      {/* Top Row: Avatar, Ticker, Name & Price */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 font-bold flex items-center justify-center text-xs shrink-0 border border-slate-200/80">
+            {stock.ticker.slice(0, 2)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-sm tracking-tight text-slate-900">{stock.ticker}</span>
+              {stock.sector && (
+                <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md font-medium">
+                  {stock.sector}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 truncate mt-0.5">{stock.name}</p>
+          </div>
+        </div>
+
+        {/* Price & Watchlist Star */}
+        <div className="flex items-center gap-1.5 shrink-0 text-right">
+          <div>
+            <div className="font-bold text-sm sm:text-base tabular-nums text-slate-900">
+              Rp {stock.price.toLocaleString("id-ID")}
+            </div>
+            <div className="flex items-center justify-end gap-1 mt-0.5">
+              <span
+                className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md tabular-nums ${
+                  isUp
+                    ? "bg-emerald-50 text-emerald-700"
+                    : isDown
+                    ? "bg-rose-50 text-rose-700"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {isUp ? "+" : ""}{stock.changePct.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleWatchlist(stock.ticker);
+            }}
+            className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-amber-500 active:scale-90 transition-transform"
+            aria-label={`Toggle Watchlist ${stock.ticker}`}
+          >
+            <Star
+              className={`w-4 h-4 transition-colors ${
+                isWatchlisted ? "fill-amber-400 text-amber-500" : "text-slate-300 hover:text-slate-400"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Middle/Bottom Row: Daily Range Bar & Secondary Metrics */}
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 gap-3">
+        {/* Left: Volume and Turnover */}
+        <div className="flex items-center gap-2 tabular-nums">
+          <span>Vol: <strong className="text-slate-700 font-semibold">{formatVolume(stock.volume)}</strong></span>
+          {turnoverStr && (
+            <>
+              <span className="text-slate-300">•</span>
+              <span>Nilai: <strong className="text-slate-700 font-semibold">{turnoverStr}</strong></span>
+            </>
           )}
         </div>
-        <p className="text-xs text-slate-400 truncate mt-0.5">{stock.name}</p>
-        <p className="text-[11px] text-slate-500 font-mono tabular-nums mt-1">
-          Vol: {(stock.volume / 1_000_000).toFixed(1)}M lembar
-        </p>
-      </div>
 
-      {/* Center Sparkline */}
-      <div className="hidden sm:block">
-        <Sparkline points={stock.sparkline} isUp={isUp} />
-      </div>
-
-      {/* Price & Change */}
-      <div className="text-right flex items-center gap-2.5">
-        <div>
-          <div className="font-mono font-bold text-sm sm:text-base tabular-nums text-slate-100">
-            Rp {stock.price.toLocaleString("id-ID")}
+        {/* Right: Daily Range Indicator or Sparkline */}
+        {hasRange ? (
+          <div className="flex items-center gap-1.5 tabular-nums text-[10px] text-slate-400 shrink-0">
+            <span>{stock.low?.toLocaleString("id-ID")}</span>
+            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
+              <div
+                className={`h-full rounded-full ${isUp ? "bg-emerald-500" : isDown ? "bg-rose-500" : "bg-slate-400"}`}
+                style={{ width: `${rangePct}%` }}
+              />
+            </div>
+            <span>{stock.high?.toLocaleString("id-ID")}</span>
           </div>
-          <div className="mt-0.5">
-            <Badge variant={isUp ? "bull" : isDown ? "bear" : "neutral"}>
-              {isUp ? "+" : ""}{stock.changePct.toFixed(2)}%
-            </Badge>
+        ) : stock.sparkline ? (
+          <div className="w-16 shrink-0">
+            <Sparkline points={stock.sparkline} isUp={isUp} />
           </div>
-        </div>
-
-        {/* Watchlist Star Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleWatchlist(stock.ticker);
-          }}
-          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-amber-400 active:scale-95 transition-transform"
-          aria-label={`Toggle Watchlist ${stock.ticker}`}
-        >
-          <Star className={`w-5 h-5 transition-colors ${isWatchlisted ? "fill-amber-400 text-amber-400" : "text-slate-600"}`} />
-        </button>
+        ) : null}
       </div>
     </div>
   );

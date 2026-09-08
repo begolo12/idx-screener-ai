@@ -9,12 +9,12 @@ export function Button({ variant = "primary", className, children, ...props }: B
   return (
     <button
       className={clsx(
-        "min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 select-none",
+        "min-h-[40px] px-4 py-2 rounded-lg font-medium text-sm transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 select-none",
         {
-          "bg-sky-500 hover:bg-sky-400 text-white shadow-sm shadow-sky-500/25": variant === "primary",
-          "bg-surface-elevated hover:bg-slate-800 text-slate-200 border border-border": variant === "secondary",
-          "bg-transparent hover:bg-surface text-slate-400 hover:text-slate-100": variant === "ghost",
-          "bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25": variant === "danger",
+          "bg-blue-600 hover:bg-blue-700 text-white shadow-sm": variant === "primary",
+          "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200": variant === "secondary",
+          "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900": variant === "ghost",
+          "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100": variant === "danger",
         },
         className
       )}
