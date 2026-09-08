@@ -1,17 +1,54 @@
 {
-  "name": "IDX Stock Screener & News",
+  "id": "/",
+  "name": "IDX Stock Screener & AI Strategy Lab",
   "short_name": "IDX Screener",
-  "description": "Screener Saham BEI dan Berita Finansial Terkini",
-  "start_url": "/",
+  "description": "Screener Saham BEI, Analisa Durasi Winrate AI Lab, dan Berita Finansial Terkini",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#07090e",
-  "theme_color": "#07090e",
-  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "business", "productivity"],
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "AI Strategy Lab",
+      "short_name": "AI Lab",
+      "description": "Buka simulasi dan analisa durasi winrate AI",
+      "url": "/?tab=ai-lab",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Koran Saham",
+      "short_name": "Koran",
+      "description": "Berita pasar modal terkini",
+      "url": "/?tab=news",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

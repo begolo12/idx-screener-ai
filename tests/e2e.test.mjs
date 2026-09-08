@@ -154,3 +154,39 @@ test("E2E - /api/watchlist supports item lifecycle (GET, POST, DELETE)", async (
   });
   assert.equal(delRes.status, 200);
 });
+
+test("E2E - PWA installability assets and service worker are fully functional", async () => {
+  // 1. Manifest test
+  const manifestRes = await fetch(`${BASE_URL}/manifest.json`);
+  assert.equal(manifestRes.status, 200);
+  const manifest = await manifestRes.json();
+  assert.equal(manifest.display, "standalone");
+  assert.ok(manifest.start_url);
+  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2);
+
+  const has192 = manifest.icons.some((i) => i.sizes === "192x192" && i.type === "image/png");
+  const has512 = manifest.icons.some((i) => i.sizes === "512x512" && i.type === "image/png");
+  assert.ok(has192, "Manifest must contain 192x192 PNG icon for Android installability");
+  assert.ok(has512, "Manifest must contain 512x512 PNG icon for Android installability");
+
+  // 2. Service Worker test
+  const swRes = await fetch(`${BASE_URL}/sw.js`);
+  assert.equal(swRes.status, 200);
+  const swContent = await swRes.text();
+  assert.ok(swContent.includes("CACHE_NAME"));
+  assert.ok(swContent.includes("addEventListener"));
+
+  // 3. PNG Icons integrity test
+  const icon192Res = await fetch(`${BASE_URL}/icon-192.png`);
+  assert.equal(icon192Res.status, 200);
+  assert.ok(icon192Res.headers.get("content-type")?.includes("image/png"));
+
+  const icon512Res = await fetch(`${BASE_URL}/icon-512.png`);
+  assert.equal(icon512Res.status, 200);
+  assert.ok(icon512Res.headers.get("content-type")?.includes("image/png"));
+
+  const appleTouchRes = await fetch(`${BASE_URL}/apple-touch-icon.png`);
+  assert.equal(appleTouchRes.status, 200);
+  assert.ok(appleTouchRes.headers.get("content-type")?.includes("image/png"));
+});
+

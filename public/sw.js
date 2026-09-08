@@ -1,8 +1,11 @@
-const CACHE_NAME = 'idx-screener-shell-v2';
+const CACHE_NAME = 'idx-screener-shell-v3';
 const ASSETS = [
   '/',
   '/manifest.json',
   '/icon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
