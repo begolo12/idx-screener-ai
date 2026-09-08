@@ -18,10 +18,10 @@ export function FilterChips({
   hasCustomFilter,
 }: FilterChipsProps) {
   const chips = [
-    { id: "gainers", label: "Top Gainers", icon: TrendingUp, activeColor: "bg-emerald-600 text-white" },
-    { id: "losers", label: "Top Losers", icon: TrendingDown, activeColor: "bg-rose-600 text-white" },
-    { id: "volume", label: "Top Volume", icon: BarChart2, activeColor: "bg-blue-600 text-white" },
-    { id: "turnover", label: "Top Turnover", icon: DollarSign, activeColor: "bg-indigo-600 text-white" },
+    { id: "gainers", label: "Paling Untung (Gainers)", icon: TrendingUp, activeColor: "bg-emerald-600 text-white" },
+    { id: "losers", label: "Paling Turun (Diskon)", icon: TrendingDown, activeColor: "bg-rose-600 text-white" },
+    { id: "volume", label: "Paling Ramai (Volume)", icon: BarChart2, activeColor: "bg-blue-600 text-white" },
+    { id: "turnover", label: "Transaksi Jumbo (Nilai)", icon: DollarSign, activeColor: "bg-indigo-600 text-white" },
   ];
 
   return (
