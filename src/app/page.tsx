@@ -156,6 +156,47 @@ export default function HomePage() {
             hasCustomFilter={hasCustomFilter}
           />
 
+          {/* Quick Highlight Cards (Top 3 Movers/Active) when no active search query */}
+          {!searchQuery && stocks.length >= 3 && !hasCustomFilter && (
+            <div className="px-4 pt-3 pb-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-800 tracking-tight">Sorotan Pasar Terkini</span>
+                <span className="text-[10px] text-slate-400 font-medium">Berdasarkan {sort === "gainers" ? "Kenaikan" : sort === "losers" ? "Koreksi" : sort === "turnover" ? "Nilai Transaksi" : "Volume"}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {stocks.slice(0, 3).map((stk) => {
+                  const up = stk.changePct > 0;
+                  const down = stk.changePct < 0;
+                  return (
+                    <button
+                      key={stk.ticker}
+                      onClick={() => setSelectedTicker(stk.ticker)}
+                      className="p-2.5 bg-white rounded-xl border border-slate-200/90 text-left hover:border-blue-400 active:scale-95 transition shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-900">{stk.ticker}</span>
+                        <span
+                          className={`text-[10px] font-bold px-1 py-0.2 rounded ${
+                            up
+                              ? "bg-emerald-50 text-emerald-700"
+                              : down
+                              ? "bg-rose-50 text-rose-700"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {up ? "+" : ""}{stk.changePct.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-800 tabular-nums mt-1">
+                        Rp {stk.price.toLocaleString("id-ID")}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Screener Status Bar: Result Count & Active Filter Tags */}
           <div className="px-4 py-2 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50/70 border-b border-slate-100">
             <span>
