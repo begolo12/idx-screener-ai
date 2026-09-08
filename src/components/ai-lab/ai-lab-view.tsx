@@ -62,9 +62,16 @@ interface SectorPickStock {
   turnoverFormatted: string;
   rsi: number;
   recommendationScore: number;
-  action: "STRONG BUY" | "BUY" | "ACCUMULATE";
+  action: "STRONG BUY" | "BUY" | "ACCUMULATE" | "HINDARI (MG SCALPER)";
   signals: string[];
   aiReason: string;
+  brokerSummary?: {
+    dominantCategory: "SMART_MONEY" | "RETAIL" | "SCALPER_SPECULATIVE" | "BALANCED";
+    isMgDominant: boolean;
+    topBuyers: string[];
+    topSellers: string[];
+    bandarmologiText: string;
+  };
 }
 
 interface SectorPicksGroup {
@@ -256,10 +263,10 @@ export function AILabView() {
               </span>
             </div>
             <h2 className="text-base font-bold text-foreground tracking-tight mt-1">
-              AI Strategy Lab & Rekomendasi Sektor
+              AI Strategy Lab & Bandarmologi Broker
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-              Analisa kuantitatif live TradingView memindai 5 saham terbaik tiap sektor untuk pertimbangan beli.
+              Memadukan indikator teknikal TradingView & profiling broker (waspada scalper MG, prioritaskan Smart Money asing).
             </p>
           </div>
 
@@ -372,7 +379,7 @@ export function AILabView() {
         </button>
       </div>
 
-      {/* Tab 0: Sector Picks (Top 5 per Sektor) */}
+      {/* Tab 0: Sector Picks (Top 5 per Sektor with Broker Insights) */}
       {activeTab === "sector-picks" && (
         <div className="space-y-4">
           {/* Sector Filter Chips */}
@@ -425,56 +432,110 @@ export function AILabView() {
                 </p>
               ) : (
                 <div className="space-y-2.5">
-                  {group.stocks.map((stock, idx) => (
-                    <div
-                      key={stock.ticker}
-                      className="rounded-lg border border-border/50 bg-secondary/20 p-3 space-y-2 hover:border-cyan-500/40 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-muted-foreground/60">
-                            #{idx + 1}
-                          </span>
-                          <span className="text-sm font-bold font-mono text-foreground tracking-tight">
-                            {stock.ticker}
-                          </span>
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
-                              stock.action === "STRONG BUY"
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                : stock.action === "BUY"
-                                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
-                                : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                            }`}
-                          >
-                            {stock.action}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs font-bold font-mono text-foreground block">
-                            Rp {stock.price.toLocaleString("id-ID")}
-                          </span>
-                          <span
-                            className={`text-[10px] font-mono font-semibold ${
-                              stock.changePct >= 0 ? "text-emerald-400" : "text-rose-400"
-                            }`}
-                          >
-                            {stock.changePct >= 0 ? "+" : ""}{stock.changePct}%
-                          </span>
-                        </div>
-                      </div>
+                  {group.stocks.map((stock, idx) => {
+                    const isMg = stock.brokerSummary?.isMgDominant;
+                    const isSmartMoney = stock.brokerSummary?.dominantCategory === "SMART_MONEY";
 
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono bg-background/40 px-2.5 py-1.5 rounded">
-                        <span>RSI: <strong className="text-foreground">{stock.rsi}</strong></span>
-                        <span>Transaksi: <strong className="text-foreground">{stock.turnoverFormatted}</strong></span>
-                        <span>Skor TV: <strong className="text-cyan-400">+{stock.recommendationScore}</strong></span>
-                      </div>
+                    return (
+                      <div
+                        key={stock.ticker}
+                        className={`rounded-lg border p-3 space-y-2 transition-colors ${
+                          isMg
+                            ? "border-rose-500/40 bg-rose-950/10 hover:border-rose-500/60"
+                            : isSmartMoney
+                            ? "border-emerald-500/30 bg-emerald-950/10 hover:border-emerald-500/50"
+                            : "border-border/50 bg-secondary/20 hover:border-cyan-500/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-muted-foreground/60">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-sm font-bold font-mono text-foreground tracking-tight">
+                              {stock.ticker}
+                            </span>
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                isMg
+                                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                  : stock.action === "STRONG BUY"
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                  : stock.action === "BUY"
+                                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                                  : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                              }`}
+                            >
+                              {stock.action}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-bold font-mono text-foreground block">
+                              Rp {stock.price.toLocaleString("id-ID")}
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono font-semibold ${
+                                stock.changePct >= 0 ? "text-emerald-400" : "text-rose-400"
+                              }`}
+                            >
+                              {stock.changePct >= 0 ? "+" : ""}{stock.changePct}%
+                            </span>
+                          </div>
+                        </div>
 
-                      <p className="text-[11px] text-muted-foreground/90 leading-snug">
-                        💡 {stock.aiReason}
-                      </p>
-                    </div>
-                  ))}
+                        {/* Bandarmologi & Broker Info Bar */}
+                        {stock.brokerSummary && (
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] font-mono bg-background/50 px-2.5 py-1.5 rounded border border-border/40">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Top Buyer:</span>
+                              <div className="flex items-center gap-1">
+                                {stock.brokerSummary.topBuyers.map((code) => (
+                                  <span
+                                    key={code}
+                                    className={`px-1 py-0.2 rounded font-bold ${
+                                      code === "MG" || code === "CP"
+                                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                                        : code === "BK" || code === "AK" || code === "ZP" || code === "KZ"
+                                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                                        : "bg-secondary text-foreground"
+                                    }`}
+                                  >
+                                    {code}
+                                    {code === "MG" && " ⚠️"}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <span
+                              className={`font-semibold ${
+                                isMg
+                                  ? "text-rose-400"
+                                  : isSmartMoney
+                                  ? "text-emerald-400"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {isMg
+                                ? "⚠️ SCALPER DOMINAN"
+                                : isSmartMoney
+                                ? "🛡️ SMART MONEY INFLOW"
+                                : "RETAIL FLOW"}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono bg-background/40 px-2.5 py-1.5 rounded">
+                          <span>RSI: <strong className="text-foreground">{stock.rsi}</strong></span>
+                          <span>Transaksi: <strong className="text-foreground">{stock.turnoverFormatted}</strong></span>
+                          <span>Skor TV: <strong className="text-cyan-400">+{stock.recommendationScore}</strong></span>
+                        </div>
+
+                        <p className={`text-[11px] leading-snug ${isMg ? "text-rose-300 font-medium" : "text-muted-foreground/90"}`}>
+                          💡 {stock.aiReason}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

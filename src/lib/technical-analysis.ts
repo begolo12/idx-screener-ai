@@ -1,3 +1,5 @@
+import { evaluateBrokerFlow, BrokerFlowAnalysis } from "./broker-analysis";
+
 export interface TechnicalStock {
   ticker: string;
   name: string;
@@ -26,9 +28,16 @@ export interface SectorPickStock {
   turnoverFormatted: string;
   rsi: number;
   recommendationScore: number;
-  action: "STRONG BUY" | "BUY" | "ACCUMULATE";
+  action: "STRONG BUY" | "BUY" | "ACCUMULATE" | "HINDARI (MG SCALPER)";
   signals: string[];
   aiReason: string;
+  brokerSummary: {
+    dominantCategory: "SMART_MONEY" | "RETAIL" | "SCALPER_SPECULATIVE" | "BALANCED";
+    isMgDominant: boolean;
+    topBuyers: string[];
+    topSellers: string[];
+    bandarmologiText: string;
+  };
 }
 
 export interface SectorPicksGroup {
@@ -209,34 +218,48 @@ export async function getSectorTopPicks(): Promise<SectorPicksGroup[]> {
       s => s.sector === sec.name && s.price >= 50 && s.turnover > 500_000_000
     );
 
-    // Rank stocks using quantitative AI scoring:
-    // Recommendation (weight 40%) + Momentum Change (weight 30%) + RSI Health (weight 20%) + Volume (10%)
     const scored = sectorStocks.map(s => {
-      let score = s.recommendation * 50; // max ~25-50
+      // Evaluasi aliran broker (Bandarmologi)
+      const brokerAnalysis: BrokerFlowAnalysis = evaluateBrokerFlow(s.ticker, s.turnover, s.changePct);
+
+      let score = s.recommendation * 50;
       if (s.changePct > 0) score += Math.min(25, s.changePct * 5);
-      if (s.rsi >= 50 && s.rsi <= 68) score += 20; // optimal bullish zone
-      else if (s.rsi < 40) score += 15; // oversold bounce potential
+      if (s.rsi >= 50 && s.rsi <= 68) score += 20;
+      else if (s.rsi < 40) score += 15;
       if (s.price > s.ema20) score += 10;
 
-      // Determine action & reasoning
-      let action: "STRONG BUY" | "BUY" | "ACCUMULATE" = "BUY";
-      let aiReason = "Momentum positif dengan likuiditas aktif di sektor ini.";
+      // Modifikasi skor dari profil broker:
+      // +20 jika Smart Money (BK, AK, ZP), -30 jika Scalper MG dominan
+      score += brokerAnalysis.suitabilityScoreModifier;
 
-      if (score >= 55 || s.recommendation >= 0.4) {
+      let action: "STRONG BUY" | "BUY" | "ACCUMULATE" | "HINDARI (MG SCALPER)" = "BUY";
+      let aiReason = "";
+
+      if (brokerAnalysis.isMgDominant) {
+        action = "HINDARI (MG SCALPER)";
+        aiReason = brokerAnalysis.aiBrokerInsight;
+      } else if (score >= 55 || s.recommendation >= 0.4) {
         action = "STRONG BUY";
-        aiReason = `Breakout kuat di atas EMA20 didukung rekomendasi teknikal TradingView (+${s.recommendation}). RSI ${s.rsi}.`;
+        aiReason = `Breakout di atas EMA20 + ${brokerAnalysis.aiBrokerInsight}`;
       } else if (s.rsi < 40) {
         action = "ACCUMULATE";
-        aiReason = `Area oversold (RSI ${s.rsi}) di dekat support teknikal. Potensi *technical rebound*.`;
+        aiReason = `Area oversold (RSI ${s.rsi}) di dekat support. ${brokerAnalysis.aiBrokerInsight}`;
       } else {
         action = "BUY";
-        aiReason = `Tren akumulasi sehat di atas EMA50 dengan sinyal ${s.signals[0] || "Uptrend"}. Target profit rasio 1:2.`;
+        aiReason = `Tren akumulasi sehat di atas EMA50. ${brokerAnalysis.aiBrokerInsight}`;
       }
 
       const val = s.turnover;
       const turnoverFormatted = val >= 1_000_000_000
         ? `${(val / 1_000_000_000).toFixed(1)} Miliar`
         : `${(val / 1_000_000).toFixed(0)} Juta`;
+
+      const signals = [...s.signals];
+      if (brokerAnalysis.isMgDominant) {
+        signals.unshift("⚠️ Rawan Guyur MG");
+      } else if (brokerAnalysis.dominantCategory === "SMART_MONEY") {
+        signals.unshift("🛡️ Smart Money");
+      }
 
       return {
         ticker: s.ticker,
@@ -249,12 +272,20 @@ export async function getSectorTopPicks(): Promise<SectorPicksGroup[]> {
         rsi: s.rsi,
         recommendationScore: s.recommendation,
         action,
-        signals: s.signals,
+        signals,
         aiReason,
+        brokerSummary: {
+          dominantCategory: brokerAnalysis.dominantCategory,
+          isMgDominant: brokerAnalysis.isMgDominant,
+          topBuyers: brokerAnalysis.topBuyers.map(b => b.code),
+          topSellers: brokerAnalysis.topSellers.map(b => b.code),
+          bandarmologiText: brokerAnalysis.bandarmologiStatus,
+        },
         _internalScore: score,
       };
     });
 
+    // Saham dengan MG dominan otomatis turun ke urutan bawah karena skor kena penalti -30
     scored.sort((a, b) => b._internalScore - a._internalScore);
 
     result.push({

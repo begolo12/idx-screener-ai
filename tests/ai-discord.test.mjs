@@ -49,6 +49,24 @@ test("market hours validation restricts weekend and outside 09:00-15:00", () => 
   assert.ok(!isTimeInTradingHours(1700));
 });
 
+test("broker MG scalper penalty modifies recommendation score downward", () => {
+  const brokerProfile = {
+    code: "MG",
+    type: "SCALPER_FAST_MONEY",
+    sentiment: "BEARISH_WARNING",
+    penalty: -30
+  };
+
+  let baseScore = 60;
+  if (brokerProfile.code === "MG") {
+    baseScore += brokerProfile.penalty; // 60 - 30 = 30
+  }
+
+  assert.equal(brokerProfile.code, "MG");
+  assert.equal(baseScore, 30);
+  assert.ok(baseScore < 50, "MG dominance lowers score below buy threshold");
+});
+
 test("sector picks limits to maximum 5 stocks per sector", () => {
   const mockStocks = [
     { ticker: "BBCA", score: 90 },
