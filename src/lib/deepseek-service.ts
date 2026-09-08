@@ -1,3 +1,5 @@
+import { SectorPicksGroup } from "./technical-analysis";
+
 interface DeepSeekMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -13,7 +15,7 @@ interface DeepSeekChatResponse {
 
 export async function callDeepSeek(
   prompt: string,
-  systemPrompt = "Anda adalah analis riset ekuitas senior Bursa Efek Indonesia (IDX). Berikan analisa pasar saham yang padat, presisi, berbasis data teknikal dan makro, tanpa basa-basi."
+  systemPrompt = "Anda adalah Kepala Riset Ekuitas (Head of Equity Research) senior Bursa Efek Indonesia (IDX). Berikan analisa pasar saham yang sangat mendalam, detail per sektor, berbasis data teknikal real-time dan flow bandarmologi broker, tajam dan profesional."
 ): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY || "sk-b73acb4ac97c4f9b8a685cfa411b1095";
   const baseUrl = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
@@ -33,7 +35,7 @@ export async function callDeepSeek(
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
-        max_tokens: 1200,
+        max_tokens: 2200,
       }),
     });
 
@@ -59,39 +61,102 @@ export async function generateMarketReportWithAI(data: {
   decliners: number;
   topGainers: Array<{ ticker: string; price: number; changePct: number; rsi: number; signals: string[] }>;
   topVolume: Array<{ ticker: string; price: number; turnoverFormatted: string }>;
+  sectorPicks: SectorPicksGroup[];
   newsHeadlines: string[];
-}): Promise<string> {
+}): Promise<{
+  macroAnalysis: string;
+  sectorAnalysis: string;
+  brokerAnalysis: string;
+  fullMarkdown: string;
+}> {
   const sessionTitle = data.session === "morning"
     ? "SESI 1 - MORNING PULSE & BREAKOUT (10:00 WIB)"
     : "SESI 2 - MARKET WRAP & CLOSING OUTLOOK (15:00 WIB)";
 
+  const sectorSummaryText = data.sectorPicks.map(sec => {
+    const stockList = sec.stocks.map(s => {
+      const brokerText = s.brokerSummary?.isMgDominant
+        ? `[⚠️ TOP BUYER MG - SCALPER RAWAN GUYUR]`
+        : `[Top Buyer: ${s.brokerSummary?.topBuyers.join(",") || "Campuran"}]`;
+      return `  • ${s.ticker}: Rp ${s.price} (${s.changePct >= 0 ? "+" : ""}${s.changePct}%), RSI: ${s.rsi}, Aksi: ${s.action} ${brokerText}`;
+    }).join("\n");
+
+    return `${sec.icon} SEKTOR ${sec.sectorName.toUpperCase()}:\n${stockList}`;
+  }).join("\n\n");
+
   const prompt = `
-Buatkan laporan analisa pasar saham Indonesia (IDX) untuk publikasi Telegram/Discord:
+Buatkan laporan riset pasar harian IHSG yang sangat komprehensif, mendalam, dan terstruktur untuk publikasi komunitas trader di Discord.
 Target Sesi: ${sessionTitle}
-Waktu: ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+Tanggal: ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
 
-Data Pasar Riil (TradingView):
+DATA PASAR RIIL (TradingView Scanner & BEI):
 - IHSG: ${data.ihsg.value} (${data.ihsg.change}, ${data.ihsg.changePct})
-- Arus Asing: ${data.foreignFlow}
-- Breadth: ${data.advancers} Menguat, ${data.decliners} Melemah
+- Arus Dana Asing (Foreign Flow): ${data.foreignFlow}
+- Market Breadth: ${data.advancers} Saham Menguat, ${data.decliners} Saham Melemah
 
-Top Saham Pendorong & Penggerak Volume:
-${data.topGainers.map(s => `- ${s.ticker}: Rp ${s.price} (${s.changePct > 0 ? "+" : ""}${s.changePct}%), RSI: ${s.rsi}, Sinyal: ${s.signals.join(", ") || "Netral"}`).join("\n")}
+DATA 6 SEKTOR DAN SAHAM PILIHAN:
+${sectorSummaryText}
 
-Turnover Tertinggi:
-${data.topVolume.map(s => `- ${s.ticker}: Rp ${s.price}, Nilai Transaksi: ${s.turnoverFormatted}`).join("\n")}
+SAHAM TURNOVER TERBESAR:
+${data.topVolume.map(s => `- ${s.ticker}: Rp ${s.price} (${s.turnoverFormatted})`).join("\n")}
 
-Katalis Berita Terkini:
-${data.newsHeadlines.slice(0, 3).map(n => `- ${n}`).join("\n")}
+BERITA & KATALIS TERBARU:
+${data.newsHeadlines.map(h => `- ${h}`).join("\n")}
 
-Format Laporan:
-1. Ringkasan Sentimen IHSG & Arah Arus Dana.
-2. Saham Sorotan & Analisa Level Teknikal (Support / Resistance / Stoploss).
-3. Strategi Aksi Trading untuk sisa sesi atau esok hari.
-Gunakan gaya bahasa analis sekuritas profesional, ringkas, padat angka, dan mudah dibaca para trader.
+INSTRUKSI FORMAT LAPORAN (SANGAT DETAIL):
+Bagi laporan menjadi 3 bagian yang jelas:
+
+[BAGIAN 1: ANALISA MAKRO & TEKNIKAL IHSG]
+- Tinjauan menyeluruh pergerakan IHSG hari ini.
+- Level teknikal: Support Kritis (S1, S2) dan Resistance Kritis (R1, R2).
+- Analisa arus dana asing dan dampaknya terhadap likuiditas pasar modal.
+
+[BAGIAN 2: BEDAH LENGKAP 6 SEKTOR BURSA]
+Jelaskan secara mendalam kondisi MASING-MASING dari 6 sektor berikut:
+1. 🏦 Sektor Keuangan: Ulasan big banks, likuiditas, dan flow asing.
+2. ⚡ Sektor Energi & Tambang: Dampak pergerakan harga komoditas dan saham penggerak.
+3. 📡 Sektor Infrastruktur & Telko: Evaluasi telekomunikasi dan utilitas.
+4. 🛒 Sektor Konsumer & Ritel: Sentimen daya beli dan stabilitas emiten defensif.
+5. 💻 Sektor Teknologi: Tren saham teknologi dan volatilitasnya.
+6. 🏭 Sektor Industri & Material: Manufaktur, semen, dan industri dasar.
+
+[BAGIAN 3: ANALISA BANDARMOLOGI & REKOMENDASI TRADING]
+- Flow Broker: Saham mana yang diakumulasi Smart Money institusi asing (BK, AK, ZP).
+- Peringatan Khusus Scalper: Bahas saham yang didominasi broker MG (Semesta Indovest) dan beri peringatan risiko guyuran.
+- Rencana trading konkrit (Target Profit & Stop Loss).
+
+Gunakan bahasa analis profesional Indonesia, kaya data angka, tidak bertele-tele, namun sangat informatif dan mendalam.
 `;
 
-  return callDeepSeek(prompt);
+  const raw = await callDeepSeek(prompt);
+
+  // Extract sections if possible
+  const parts = raw.split(/\[BAGIAN \d:[^\]]+\]/i);
+  let macroAnalysis = "";
+  let sectorAnalysis = "";
+  let brokerAnalysis = "";
+
+  if (parts.length >= 4) {
+    macroAnalysis = parts[1].trim();
+    sectorAnalysis = parts[2].trim();
+    brokerAnalysis = parts[3].trim();
+  } else {
+    // Split into chunks if tags weren't exact
+    const paragraphs = raw.split("\n\n");
+    const mid1 = Math.floor(paragraphs.length / 3);
+    const mid2 = Math.floor((paragraphs.length * 2) / 3);
+
+    macroAnalysis = paragraphs.slice(0, mid1).join("\n\n").trim();
+    sectorAnalysis = paragraphs.slice(mid1, mid2).join("\n\n").trim();
+    brokerAnalysis = paragraphs.slice(mid2).join("\n\n").trim();
+  }
+
+  return {
+    macroAnalysis,
+    sectorAnalysis,
+    brokerAnalysis,
+    fullMarkdown: raw,
+  };
 }
 
 export async function evaluateTradingSchemeWithAI(params: {

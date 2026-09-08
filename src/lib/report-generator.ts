@@ -1,7 +1,7 @@
 import { getMarketOverview } from "./market-service";
-import { getMarketTechnicalSummary, getTechnicalStocks } from "./technical-analysis";
+import { getMarketTechnicalSummary, getTechnicalStocks, getSectorTopPicks } from "./technical-analysis";
 import { generateMarketReportWithAI } from "./deepseek-service";
-import { buildMarketReportDiscordEmbed, sendDiscordWebhook } from "./discord-service";
+import { buildFullMarketReportDiscordEmbeds, sendDiscordWebhook } from "./discord-service";
 import { getStrategyLabState } from "./strategy-engine";
 import { zpi } from "./zapi";
 
@@ -27,11 +27,12 @@ export async function generateAndDispatchMarketReport(
   session: "morning" | "closing",
   customWebhookUrl?: string
 ): Promise<GeneratedReport> {
-  const [marketData, technicalSummary, techStocks, strategyState] = await Promise.all([
+  const [marketData, technicalSummary, techStocks, strategyState, sectorPicks] = await Promise.all([
     getMarketOverview(),
     getMarketTechnicalSummary(),
     getTechnicalStocks(20),
     getStrategyLabState(),
+    getSectorTopPicks(),
   ]);
 
   // Fetch news headlines from Zapi
@@ -42,8 +43,8 @@ export async function generateAndDispatchMarketReport(
     headlines = items.slice(0, 4).map((n: any) => n.title || n.headline).filter(Boolean);
   } catch {
     headlines = [
-      "IHSG fluktuatif merespons pergerakan bursa regional Asia.",
-      "Sektor perbankan dan energi menjadi penopang likuiditas pasar modal.",
+      "IHSG fluktuatif merespons pergerakan bursa regional Asia dan komoditas global.",
+      "Sektor perbankan dan energi menjadi penopang likuiditas pasar modal BEI.",
     ];
   }
 
@@ -58,7 +59,7 @@ export async function generateAndDispatchMarketReport(
       signals: s.signals,
     }));
 
-  const topVolumeFormatted = techStocks.slice(0, 3).map(s => {
+  const topVolumeFormatted = techStocks.slice(0, 4).map(s => {
     const val = s.turnover;
     const formatted = val >= 1_000_000_000
       ? `${(val / 1_000_000_000).toFixed(1)} Miliar`
@@ -70,8 +71,8 @@ export async function generateAndDispatchMarketReport(
     };
   });
 
-  // Generate analysis text using DeepSeek
-  const aiAnalysis = await generateMarketReportWithAI({
+  // Generate detailed report with sector-by-sector and broker bandarmologi analysis
+  const aiReport = await generateMarketReportWithAI({
     session,
     ihsg: marketData.ihsg,
     foreignFlow: marketData.foreignFlow.netBuySell,
@@ -79,6 +80,7 @@ export async function generateAndDispatchMarketReport(
     decliners: technicalSummary.decliners,
     topGainers: topGainersFormatted,
     topVolume: topVolumeFormatted,
+    sectorPicks,
     newsHeadlines: headlines,
   });
 
@@ -88,21 +90,23 @@ export async function generateAndDispatchMarketReport(
   let discordError: string | undefined;
 
   if (webhookUrl) {
-    const embed = buildMarketReportDiscordEmbed({
+    const embeds = buildFullMarketReportDiscordEmbeds({
       session,
       ihsg: marketData.ihsg,
       foreignFlow: marketData.foreignFlow.netBuySell,
-      aiAnalysis,
-      topGainers: topGainersFormatted,
+      macroAnalysis: aiReport.macroAnalysis,
+      sectorAnalysis: aiReport.sectorAnalysis,
+      brokerAnalysis: aiReport.brokerAnalysis,
+      sectorPicks,
       activeSchemeName: strategyState.activeScheme.name,
       winRate: strategyState.metrics.winRate,
     });
 
     const sendRes = await sendDiscordWebhook(webhookUrl, {
       content: session === "morning"
-        ? "📢 **Laporan Pasar Sesi 1 (10:00 WIB) telah terbit!**"
-        : "📢 **Laporan Penutupan Pasar Sesi 2 (15:00 WIB) telah terbit!**",
-      embeds: [embed],
+        ? "📢 **[LAPORAN PASAR IDX SESI 1] — Analisa Makro, Bedah 6 Sektor & Flow Bandarmologi**"
+        : "📢 **[LAPORAN PASAR IDX PENUTUPAN] — Analisa Makro, Bedah 6 Sektor & Flow Bandarmologi**",
+      embeds,
     });
 
     discordDispatched = sendRes.success;
@@ -114,7 +118,7 @@ export async function generateAndDispatchMarketReport(
     generatedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
     ihsg: marketData.ihsg,
     foreignFlow: marketData.foreignFlow.netBuySell,
-    aiAnalysis,
+    aiAnalysis: aiReport.fullMarkdown,
     activeScheme: strategyState.activeScheme.name,
     winRate: strategyState.metrics.winRate,
     discordDispatched,
