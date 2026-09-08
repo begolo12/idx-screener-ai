@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, RefreshCw, TrendingUp, ShieldCheck, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { Sparkles, RefreshCw, TrendingUp, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Cpu } from "lucide-react";
 
 interface TradingScheme {
   id: string;
@@ -95,6 +95,16 @@ interface StrategyLabState {
     cumulativePnlPct: number;
     lastEvaluationDate: string;
     aiRationale: string;
+  };
+  aiLearning?: {
+    isAutonomous: boolean;
+    targetWinRate: number;
+    currentWinRate: number;
+    status: string;
+    whenHold: string;
+    whenRotate: string;
+    schemeMechanism: string;
+    nextEvaluationCriterion: string;
   };
   openPositions: PaperTrade[];
   tradeHistory: PaperTrade[];
@@ -257,44 +267,95 @@ export function AILabView() {
       </div>
 
       {/* AI Strategy Engine Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5 shadow-xs">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <Cpu className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">
                 AI Strategy Lab & Bandarmologi
               </h2>
               <p className="text-[11px] text-slate-500">
-                Skema Aktif: <strong className="text-blue-600">{activeScheme.name}</strong> (TP +{activeScheme.targetProfitPct}% / SL -{activeScheme.stopLossPct}%)
+                Skema Berjalan: <strong className="text-blue-600 font-bold">{activeScheme.name}</strong> (TP +{activeScheme.targetProfitPct}% / SL -{activeScheme.stopLossPct}%)
               </p>
             </div>
           </div>
 
-          <button
-            onClick={handleOptimize}
-            disabled={optimizing}
-            className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-1.5 active:scale-95 shrink-0"
-          >
-            {optimizing ? (
-              <>
-                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>Evaluasi...</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Rotasi Skema</span>
-              </>
-            )}
-          </button>
+          {/* Autonomous Status Badge (Non-clickable, AI Self-Learning) */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-[10px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+              Otonom (Self-Learning)
+            </span>
+            <span className="text-[10px] text-slate-500 font-medium tabular-nums">
+              Target: <strong className="text-emerald-700 font-bold">95% Winrate</strong>
+            </span>
+          </div>
         </div>
 
+        {/* Alasan Pemilihan & Status Berjalan */}
         <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
           {state.metrics.aiRationale}
         </p>
+      </div>
+
+      {/* Penjelasan Lengkap Skema & Logika Pembelajaran Otonom AI */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              Mekanisme Skema & Logika AI
+            </h3>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {state.aiLearning?.status || "MEMPERTAHANKAN SKEMA"}
+          </span>
+        </div>
+
+        {/* Cara Kerja Skema Aktif */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Cara Kerja Skema Saat Ini:</span>
+            <span className="text-[11px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+              {activeScheme.name}
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
+            {state.aiLearning?.schemeMechanism || activeScheme.description}
+          </p>
+        </div>
+
+        {/* Matriks Keputusan Pembelajaran Mandiri AI */}
+        <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1">
+            <span className="text-[10px] font-bold text-emerald-800 flex items-center gap-1 uppercase tracking-wider">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              Kapan AI Tetap
+            </span>
+            <p className="text-[11px] text-emerald-950 leading-snug">
+              {state.aiLearning?.whenHold || "Winrate konsisten ≥ 75% & IHSG sejalan dengan momentum volume."}
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
+            <span className="text-[10px] font-bold text-amber-800 flex items-center gap-1 uppercase tracking-wider">
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+              Kapan AI Ganti Skema
+            </span>
+            <p className="text-[11px] text-amber-950 leading-snug">
+              {state.aiLearning?.whenRotate || "Terdeteksi 2x Stop Loss berturut-turut atau regim pasar bergeser."}
+            </p>
+          </div>
+        </div>
+
+        {/* Kriteria Adaptif */}
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+          <span>Target Akurasi: <strong className="text-emerald-700 font-bold">95%</strong> (Terkini: {state.metrics.winRate}%)</span>
+          <span className="text-slate-400 font-medium">Evaluasi Real-time</span>
+        </div>
       </div>
 
       {/* Optimization Result Alert */}
