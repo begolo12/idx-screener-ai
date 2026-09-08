@@ -333,11 +333,11 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
   const totalProfitNominal = totalEquity - INITIAL_CAPITAL;
   const totalProfitPct = Number((((totalEquity - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100).toFixed(2));
 
-  // Metrics from closed trades
+  // Metrics from closed trades (strictly based on real closed trades)
   const closed = globalState.tradeHistory;
   const wins = closed.filter(t => t.pnlPct > 0).length;
   const total = closed.length;
-  const winRate = total > 0 ? Number(((wins / total) * 100).toFixed(1)) : (globalState.openPositions.filter(p => p.pnlPct >= 0).length > 0 ? 100 : 0);
+  const winRate = total > 0 ? Number(((wins / total) * 100).toFixed(1)) : 0;
   const cumulativePnlPct = Number(closed.reduce((acc, t) => acc + t.pnlPct, 0).toFixed(2));
 
   return {

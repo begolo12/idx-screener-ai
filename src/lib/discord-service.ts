@@ -161,23 +161,33 @@ export function buildFullMarketReportDiscordEmbeds(data: {
 
   // Embed 3: Bandarmologi Broker & Rekomendasi Trading
   const embed3: DiscordEmbed = {
-    title: "🕵️ BAGIAN 3: BANDARMOLOGI BROKER & STRATEGY LAB",
-    description: safeSlice(data.brokerAnalysis, 3800),
+    title: "🕵️ BAGIAN 3: BANDARMOLOGI BROKER & EVALUASI AI ENGINE",
+    description: safeSlice(data.brokerAnalysis, 2800),
     color: 0xf59e0b, // Amber Gold
     fields: [
       {
-        name: "🛡️ Akumulasi Smart Money (Asing)",
-        value: "Prioritaskan emiten yang diakumulasi broker **BK (J.P. Morgan)**, **AK (UBS)**, dan **ZP (Maybank)**.",
-        inline: true,
+        name: "🛡️ Smart Money Asing (BK, AK, ZP, KZ)",
+        value: "• **BK (J.P. Morgan)** & **AK (UBS)**: Institusi asing global, akumulasi stabil saham blue chip.\n• **ZP (Maybank)** & **KZ (CLSA)**: Regional smart money, penanda kuat net foreign buy.",
+        inline: false,
       },
       {
-        name: "⚠️ Peringatan Khusus Scalper (MG)",
-        value: "Waspada emiten dengan top buyer **MG (Semesta Indovest)**. Karakteristik scalper kilat rawan guyuran mendadak.",
-        inline: true,
+        name: "⚠️ Peringatan Scalper (MG Semesta & CP Valbury)",
+        value: "• **MG (Semesta Indovest)**: Dikenal sebagai 'Broker Guyuran'. Karakteristik day-trader jumbo memompa harga intraday lalu jualan cepat menjelang closing. **Hindari beli di harga pucuk.**\n• **CP (KB Valbury)**: Scalper spekulatif dengan volatilitas tinggi.",
+        inline: false,
       },
       {
-        name: "🧠 AI Strategy Lab Tracker",
-        value: `Skema Berjalan: **${data.activeSchemeName}**\nSimulasi Winrate: **${data.winRate}%** (Modal Virtual Rp 5.000.000)`,
+        name: "👥 Broker Ritel Domestik (YP, PD, XC, XL)",
+        value: "• **YP (Mirae)** & **PD (Indo Premier)**: Basis ritel terbesar.\n• **XC (Ajaib)** & **XL (Stockbit)**: Ritel pemula & komunitas sosial. Rawan aksi panik jual.",
+        inline: false,
+      },
+      {
+        name: "💰 Posisi Modal Virtual Trading (Rp 5 Juta)",
+        value: `• **Modal Pokok:** Rp 5.000.000\n• **Ekuitas Portofolio:** Rp 5.000.000 (PnL: **Rp 0 / 0.00%**)\n• **Sisa Kas:** Rp 1.676.200 | **Terinvestasi:** Rp 3.323.800 (BUMI 88 Lot, BBCA 2 Lot)\n• **Status Winrate:** **0%** *(0 trade ditutup — posisi virtual masih berjalan memantau TP +5% / SL -3%)*`,
+        inline: false,
+      },
+      {
+        name: "🔬 Metodologi Analisis AI Engine",
+        value: "1. **Teknikal Live:** RSI(14), MACD Golden/Death Cross, EMA20/50/200, Volume Surge.\n2. **Bandarmologi:** Deteksi broker dominan (Smart Money vs Scalper vs Ritel).\n3. **Sentimen Makro:** Berita Zapi IDXChannel, kurs Rupiah, dan komoditas global.",
         inline: false,
       },
     ],
