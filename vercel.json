@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/market-report?session=morning",
+      "schedule": "0 3 * * 1-5"
+    },
+    {
+      "path": "/api/cron/market-report?session=closing",
+      "schedule": "0 8 * * 1-5"
+    }
+  ]
+}

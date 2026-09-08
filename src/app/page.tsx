@@ -8,13 +8,15 @@ import { StockModal } from "@/components/screener/stock-modal";
 import { FilterDrawer } from "@/components/screener/filter-drawer";
 import { NewsView } from "@/components/news/news-view";
 import { WatchlistView } from "@/components/watchlist/watchlist-view";
-import { BottomNav } from "@/components/navigation/bottom-nav";
+import { AnalysisDashboard } from "@/components/analysis/analysis-dashboard";
+import { AILabView } from "@/components/ai-lab/ai-lab-view";
+import { BottomNav, NavTab } from "@/components/navigation/bottom-nav";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 
 export default function HomePage() {
-  const [tab, setTab] = useState<"screener" | "news" | "watchlist">("screener");
+  const [tab, setTab] = useState<NavTab>("screener");
   const [sort, setSort] = useState("gainers");
   const [sector, setSector] = useState("Semua");
   const [minPrice, setMinPrice] = useState("");
@@ -139,6 +141,18 @@ export default function HomePage() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {tab === "analysis" && (
+        <div className="p-4 flex-1">
+          <AnalysisDashboard />
+        </div>
+      )}
+
+      {tab === "ailab" && (
+        <div className="p-4 flex-1">
+          <AILabView />
         </div>
       )}
 
