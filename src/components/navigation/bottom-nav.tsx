@@ -9,12 +9,19 @@ interface BottomNavProps {
   watchlistCount: number;
 }
 
+interface TabItem {
+  id: "screener" | "news" | "watchlist";
+  label: string;
+  icon: typeof Filter;
+  count?: number;
+}
+
 export function BottomNav({ currentTab, onChangeTab, watchlistCount }: BottomNavProps) {
-  const tabs = [
+  const tabs: TabItem[] = [
     { id: "screener", label: "Screener", icon: Filter },
     { id: "news", label: "Berita", icon: Newspaper },
     { id: "watchlist", label: "Watchlist", icon: Star, count: watchlistCount },
-  ] as const;
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border max-w-md mx-auto safe-bottom">

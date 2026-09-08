@@ -171,7 +171,7 @@ export async function getStockQuote(ticker: string) {
     const related: any = await zpi.run("finance:idxchannel", "related", { code: symbol }).catch(() => []);
 
     const allStocks = await getAllStocks();
-    const stockInfo = allStocks.find((s) => s.ticker === symbol);
+    const stockInfo = allStocks.find((s: any) => s.ticker === symbol);
     const price = stockInfo?.price || Number(quote?.last || quote?.price || 5000);
 
     return {
