@@ -202,10 +202,11 @@ let globalState: {
 };
 
 let isInitialized = false;
+let lastDrawdownRotatedTradeId = "";
 
 // Initialize positions with real TradingView data fitting Rp 5.000.000 budget
 async function initRealPositionsIfEmpty() {
-  if (isInitialized && globalState.openPositions.length > 0) return;
+  if (isInitialized) return;
   try {
     const liveStocks = await getTechnicalStocks(25);
     // Find top 2 real stocks from TradingView
@@ -227,8 +228,8 @@ async function initRealPositionsIfEmpty() {
 
         if (availableCash >= cost) {
           availableCash -= cost;
-          const tp = Math.round(s.price * 1.05);
-          const sl = Math.round(s.price * 0.97);
+          const tp = Math.round(s.price * (1 + globalState.activeScheme.targetProfitPct / 100));
+          const sl = Math.round(s.price * (1 - globalState.activeScheme.stopLossPct / 100));
 
           initialPositions.push({
             id: `live-pos-${s.ticker}-${i}`,
@@ -357,9 +358,13 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
 
   // Criterion 1: Drawdown rule - 2 consecutive Stop Losses on closed trades
   const lastTwoClosed = closed.slice(0, 2);
-  const isDrawdownTriggered = lastTwoClosed.length >= 2 && lastTwoClosed.every(t => t.status === "CLOSED_SL" || t.pnlPct < 0);
+  const isDrawdownTriggered =
+    lastTwoClosed.length >= 2 &&
+    lastTwoClosed.every(t => t.status === "CLOSED_SL" || t.pnlPct < 0) &&
+    lastTwoClosed[0].id !== lastDrawdownRotatedTradeId;
 
   if (isDrawdownTriggered) {
+    lastDrawdownRotatedTradeId = lastTwoClosed[0].id;
     const nextSchemeId = globalState.activeScheme.id === "breakout" ? "trend" : globalState.activeScheme.id === "trend" ? "mean_reversion" : "breakout";
     const nextScheme = SCHEMES.find(s => s.id === nextSchemeId) || SCHEMES[0];
     globalState.activeScheme = nextScheme;

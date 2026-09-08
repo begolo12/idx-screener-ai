@@ -87,7 +87,12 @@ export function StockCard({ stock, isWatchlisted, onToggleWatchlist, onClick }: 
             <div className="font-bold text-sm sm:text-base tabular-nums text-slate-900">
               Rp {stock.price.toLocaleString("id-ID")}
             </div>
-            <div className="flex items-center justify-end gap-1 mt-0.5">
+            <div className="flex items-center justify-end gap-1.5 mt-0.5">
+              {nominalChange !== 0 && (
+                <span className={`text-[10px] tabular-nums font-medium ${isUp ? "text-emerald-600" : isDown ? "text-rose-600" : "text-slate-400"}`}>
+                  {nominalChange > 0 ? "+" : ""}{nominalChange.toLocaleString("id-ID")}
+                </span>
+              )}
               <span
                 className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md tabular-nums ${
                   isUp
