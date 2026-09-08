@@ -28,10 +28,15 @@ export async function sendDiscordWebhook(
   webhookUrl: string,
   payload: DiscordWebhookPayload
 ): Promise<{ success: boolean; error?: string }> {
-  if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
+  const isValidDiscord = webhookUrl && (
+    webhookUrl.startsWith("https://discord.com/api/webhooks/") ||
+    webhookUrl.startsWith("https://discordapp.com/api/webhooks/")
+  );
+
+  if (!isValidDiscord) {
     return {
       success: false,
-      error: "URL Discord Webhook tidak valid. Pastikan diawali dengan https://discord.com/api/webhooks/",
+      error: "URL Discord Webhook tidak valid. Pastikan diawali dengan https://discord.com/api/webhooks/ atau https://discordapp.com/api/webhooks/",
     };
   }
 

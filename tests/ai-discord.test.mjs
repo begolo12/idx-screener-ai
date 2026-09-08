@@ -86,8 +86,13 @@ test("sector picks limits to maximum 5 stocks per sector", () => {
 
 test("discord webhook validator detects valid and invalid urls", () => {
   const validUrl = "https://discord.com/api/webhooks/123456/abcdef";
+  const validAppUrl = "https://discordapp.com/api/webhooks/123456/abcdef";
   const invalidUrl = "https://example.com/invalid";
 
-  assert.ok(validUrl.startsWith("https://discord.com/api/webhooks/"));
-  assert.ok(!invalidUrl.startsWith("https://discord.com/api/webhooks/"));
+  const isValid = (url) => url.startsWith("https://discord.com/api/webhooks/") || url.startsWith("https://discordapp.com/api/webhooks/");
+
+  assert.ok(isValid(validUrl));
+  assert.ok(isValid(validAppUrl));
+  assert.ok(!isValid(invalidUrl));
 });
+
