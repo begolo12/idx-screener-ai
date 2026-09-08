@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { getStrategyLabState, runAIStrategyOptimization } from "@/lib/strategy-engine";
+import { getSectorTopPicks } from "@/lib/technical-analysis";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const state = await getStrategyLabState();
-    return NextResponse.json({ success: true, state });
+    const [state, sectorPicks] = await Promise.all([
+      getStrategyLabState(),
+      getSectorTopPicks(),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      state,
+      sectorPicks,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || "Failed to load AI strategy lab state" },
@@ -18,11 +27,16 @@ export async function GET() {
 export async function POST() {
   try {
     const optimization = await runAIStrategyOptimization();
-    const updatedState = await getStrategyLabState();
+    const [updatedState, sectorPicks] = await Promise.all([
+      getStrategyLabState(),
+      getSectorTopPicks(),
+    ]);
+
     return NextResponse.json({
       success: true,
       optimization,
       state: updatedState,
+      sectorPicks,
     });
   } catch (err: any) {
     return NextResponse.json(

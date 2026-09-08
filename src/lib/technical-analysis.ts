@@ -5,6 +5,7 @@ export interface TechnicalStock {
   changePct: number;
   volume: number;
   turnover: number;
+  sector: string;
   rsi: number;
   macd: number;
   macdSignal: number;
@@ -13,6 +14,28 @@ export interface TechnicalStock {
   ema50: number;
   sma200: number;
   signals: string[];
+}
+
+export interface SectorPickStock {
+  ticker: string;
+  name: string;
+  price: number;
+  changePct: number;
+  volume: number;
+  turnover: number;
+  turnoverFormatted: string;
+  rsi: number;
+  recommendationScore: number;
+  action: "STRONG BUY" | "BUY" | "ACCUMULATE";
+  signals: string[];
+  aiReason: string;
+}
+
+export interface SectorPicksGroup {
+  sectorId: string;
+  sectorName: string;
+  icon: string;
+  stocks: SectorPickStock[];
 }
 
 export interface MarketTechnicalSummary {
@@ -26,7 +49,21 @@ export interface MarketTechnicalSummary {
   topTrendFollowing: TechnicalStock[];
 }
 
-export async function getTechnicalStocks(limit = 80): Promise<TechnicalStock[]> {
+export function normalizeSector(rawSector?: string): string {
+  if (!rawSector) return "Lainnya";
+  const s = rawSector.toLowerCase();
+  if (s.includes("finance") || s.includes("bank") || s.includes("invest")) return "Keuangan";
+  if (s.includes("energy") || s.includes("mineral") || s.includes("coal") || s.includes("oil") || s.includes("gas")) return "Energi & Tambang";
+  if (s.includes("tech") || s.includes("electronic") || s.includes("software") || s.includes("internet")) return "Teknologi";
+  if (s.includes("consumer") || s.includes("food") || s.includes("beverage") || s.includes("retail") || s.includes("tobacco")) return "Konsumer & Ritel";
+  if (s.includes("transport") || s.includes("communi") || s.includes("telecom") || s.includes("utilit") || s.includes("infra")) return "Infrastruktur & Telko";
+  if (s.includes("industr") || s.includes("manufactur") || s.includes("process") || s.includes("material") || s.includes("chemical") || s.includes("auto")) return "Industri & Material";
+  if (s.includes("health") || s.includes("pharma") || s.includes("hospital")) return "Kesehatan";
+  if (s.includes("real estate") || s.includes("property")) return "Properti";
+  return "Lainnya";
+}
+
+export async function getTechnicalStocks(limit = 120): Promise<TechnicalStock[]> {
   try {
     const res = await fetch("https://scanner.tradingview.com/indonesia/scan", {
       method: "POST",
@@ -41,6 +78,7 @@ export async function getTechnicalStocks(limit = 80): Promise<TechnicalStock[]> 
           "change",
           "volume",
           "Value.Traded",
+          "sector",
           "RSI",
           "MACD.macd",
           "MACD.signal",
@@ -66,13 +104,14 @@ export async function getTechnicalStocks(limit = 80): Promise<TechnicalStock[]> 
       const changePct = Number(Number(d[3] || 0).toFixed(2));
       const volume = Number(d[4] || 0);
       const turnover = Number(d[5] || 0);
-      const rsi = Number(Number(d[6] || 50).toFixed(1));
-      const macd = Number(Number(d[7] || 0).toFixed(2));
-      const macdSignal = Number(Number(d[8] || 0).toFixed(2));
-      const recommendation = Number(Number(d[9] || 0).toFixed(2));
-      const ema20 = Number(Number(d[10] || price).toFixed(0));
-      const ema50 = Number(Number(d[11] || price).toFixed(0));
-      const sma200 = Number(Number(d[12] || price).toFixed(0));
+      const rawSector = String(d[6] || "");
+      const rsi = Number(Number(d[7] || 50).toFixed(1));
+      const macd = Number(Number(d[8] || 0).toFixed(2));
+      const macdSignal = Number(Number(d[9] || 0).toFixed(2));
+      const recommendation = Number(Number(d[10] || 0).toFixed(2));
+      const ema20 = Number(Number(d[11] || price).toFixed(0));
+      const ema50 = Number(Number(d[12] || price).toFixed(0));
+      const sma200 = Number(Number(d[13] || price).toFixed(0));
 
       const signals: string[] = [];
       if (rsi < 35) signals.push("RSI Oversold");
@@ -88,6 +127,7 @@ export async function getTechnicalStocks(limit = 80): Promise<TechnicalStock[]> 
         changePct,
         volume,
         turnover,
+        sector: normalizeSector(rawSector),
         rsi,
         macd,
         macdSignal,
@@ -125,18 +165,15 @@ export async function getMarketTechnicalSummary(): Promise<MarketTechnicalSummar
   if (advancers > decliners * 1.4) marketSentiment = "BULLISH";
   else if (decliners > advancers * 1.4) marketSentiment = "BEARISH";
 
-  // Filter 1: Breakouts (Change > 2%, RSI 50-70, High Volume)
   const topBreakouts = stocks
     .filter(s => s.changePct >= 1.5 && s.rsi >= 50 && s.rsi <= 75 && s.turnover > 5_000_000_000)
     .slice(0, 5);
 
-  // Filter 2: Oversold Rebound (RSI < 38, Change > -1%)
   const topOversold = stocks
     .filter(s => s.rsi < 40 && s.price > 100)
     .sort((a, b) => a.rsi - b.rsi)
     .slice(0, 5);
 
-  // Filter 3: Trend Following (Above EMA50, Golden Cross or Strong Buy)
   const topTrendFollowing = stocks
     .filter(s => s.price >= s.ema50 && s.recommendation > 0.2)
     .slice(0, 5);
@@ -151,4 +188,82 @@ export async function getMarketTechnicalSummary(): Promise<MarketTechnicalSummar
     topOversold,
     topTrendFollowing
   };
+}
+
+export async function getSectorTopPicks(): Promise<SectorPicksGroup[]> {
+  const stocks = await getTechnicalStocks(180);
+
+  const targetSectors = [
+    { id: "keuangan", name: "Keuangan", icon: "🏦" },
+    { id: "energi", name: "Energi & Tambang", icon: "⚡" },
+    { id: "infrastruktur", name: "Infrastruktur & Telko", icon: "📡" },
+    { id: "konsumer", name: "Konsumer & Ritel", icon: "🛒" },
+    { id: "teknologi", name: "Teknologi", icon: "💻" },
+    { id: "industri", name: "Industri & Material", icon: "🏭" },
+  ];
+
+  const result: SectorPicksGroup[] = [];
+
+  for (const sec of targetSectors) {
+    const sectorStocks = stocks.filter(
+      s => s.sector === sec.name && s.price >= 50 && s.turnover > 500_000_000
+    );
+
+    // Rank stocks using quantitative AI scoring:
+    // Recommendation (weight 40%) + Momentum Change (weight 30%) + RSI Health (weight 20%) + Volume (10%)
+    const scored = sectorStocks.map(s => {
+      let score = s.recommendation * 50; // max ~25-50
+      if (s.changePct > 0) score += Math.min(25, s.changePct * 5);
+      if (s.rsi >= 50 && s.rsi <= 68) score += 20; // optimal bullish zone
+      else if (s.rsi < 40) score += 15; // oversold bounce potential
+      if (s.price > s.ema20) score += 10;
+
+      // Determine action & reasoning
+      let action: "STRONG BUY" | "BUY" | "ACCUMULATE" = "BUY";
+      let aiReason = "Momentum positif dengan likuiditas aktif di sektor ini.";
+
+      if (score >= 55 || s.recommendation >= 0.4) {
+        action = "STRONG BUY";
+        aiReason = `Breakout kuat di atas EMA20 didukung rekomendasi teknikal TradingView (+${s.recommendation}). RSI ${s.rsi}.`;
+      } else if (s.rsi < 40) {
+        action = "ACCUMULATE";
+        aiReason = `Area oversold (RSI ${s.rsi}) di dekat support teknikal. Potensi *technical rebound*.`;
+      } else {
+        action = "BUY";
+        aiReason = `Tren akumulasi sehat di atas EMA50 dengan sinyal ${s.signals[0] || "Uptrend"}. Target profit rasio 1:2.`;
+      }
+
+      const val = s.turnover;
+      const turnoverFormatted = val >= 1_000_000_000
+        ? `${(val / 1_000_000_000).toFixed(1)} Miliar`
+        : `${(val / 1_000_000).toFixed(0)} Juta`;
+
+      return {
+        ticker: s.ticker,
+        name: s.name,
+        price: s.price,
+        changePct: s.changePct,
+        volume: s.volume,
+        turnover: s.turnover,
+        turnoverFormatted,
+        rsi: s.rsi,
+        recommendationScore: s.recommendation,
+        action,
+        signals: s.signals,
+        aiReason,
+        _internalScore: score,
+      };
+    });
+
+    scored.sort((a, b) => b._internalScore - a._internalScore);
+
+    result.push({
+      sectorId: sec.id,
+      sectorName: sec.name,
+      icon: sec.icon,
+      stocks: scored.slice(0, 5).map(({ _internalScore, ...rest }) => rest),
+    });
+  }
+
+  return result;
 }

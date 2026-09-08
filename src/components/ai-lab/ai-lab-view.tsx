@@ -52,6 +52,28 @@ interface PortfolioBalance {
   totalProfitPct: number;
 }
 
+interface SectorPickStock {
+  ticker: string;
+  name: string;
+  price: number;
+  changePct: number;
+  volume: number;
+  turnover: number;
+  turnoverFormatted: string;
+  rsi: number;
+  recommendationScore: number;
+  action: "STRONG BUY" | "BUY" | "ACCUMULATE";
+  signals: string[];
+  aiReason: string;
+}
+
+interface SectorPicksGroup {
+  sectorId: string;
+  sectorName: string;
+  icon: string;
+  stocks: SectorPickStock[];
+}
+
 interface StrategyLabState {
   marketStatus: MarketScheduleStatus;
   portfolio: PortfolioBalance;
@@ -72,9 +94,11 @@ interface StrategyLabState {
 
 export function AILabView() {
   const [state, setState] = useState<StrategyLabState | null>(null);
+  const [sectorPicks, setSectorPicks] = useState<SectorPicksGroup[]>([]);
+  const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [optimizing, setOptimizing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"positions" | "history" | "schemes">("positions");
+  const [activeTab, setActiveTab] = useState<"sector-picks" | "positions" | "history" | "schemes">("sector-picks");
   const [optResult, setOptResult] = useState<{
     marketIsOpen: boolean;
     marketMessage: string;
@@ -89,6 +113,9 @@ export function AILabView() {
       const data = await res.json();
       if (data.success) {
         setState(data.state);
+        if (data.sectorPicks) {
+          setSectorPicks(data.sectorPicks);
+        }
       }
     } catch (err) {
       console.error("Failed to load AI lab state:", err);
@@ -112,6 +139,9 @@ export function AILabView() {
       if (data.success) {
         setOptResult(data.optimization);
         setState(data.state);
+        if (data.sectorPicks) {
+          setSectorPicks(data.sectorPicks);
+        }
       }
     } catch (err) {
       console.error("Failed to optimize AI scheme:", err);
@@ -130,6 +160,10 @@ export function AILabView() {
   }
 
   const { marketStatus, portfolio, activeScheme, openPositions, tradeHistory, availableSchemes } = state;
+
+  const filteredSectors = selectedSectorFilter === "all"
+    ? sectorPicks
+    : sectorPicks.filter(s => s.sectorId === selectedSectorFilter);
 
   return (
     <div className="space-y-4 pb-20">
@@ -222,10 +256,10 @@ export function AILabView() {
               </span>
             </div>
             <h2 className="text-base font-bold text-foreground tracking-tight mt-1">
-              AI Strategy Lab & Paper Trading
+              AI Strategy Lab & Rekomendasi Sektor
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-              Mengevaluasi skema kuantitatif, merotasi strategi saat performa turun, dan mengeksekusi lot saham pada jam buka bursa.
+              Analisa kuantitatif live TradingView memindai 5 saham terbaik tiap sektor untuk pertimbangan beli.
             </p>
           </div>
 
@@ -294,12 +328,23 @@ export function AILabView() {
       )}
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex gap-2 border-b border-border/80 pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-border/80 pb-2">
+        <button
+          onClick={() => setActiveTab("sector-picks")}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+            activeTab === "sector-picks"
+              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>⭐</span>
+          <span>Top 5 Tiap Sektor ({sectorPicks.reduce((acc, s) => acc + s.stocks.length, 0)})</span>
+        </button>
         <button
           onClick={() => setActiveTab("positions")}
-          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             activeTab === "positions"
-              ? "bg-primary text-primary-foreground font-semibold"
+              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -307,25 +352,135 @@ export function AILabView() {
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             activeTab === "history"
-              ? "bg-primary text-primary-foreground font-semibold"
+              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Riwayat Trade Selesai ({tradeHistory.length})
+          Riwayat Trade ({tradeHistory.length})
         </button>
         <button
           onClick={() => setActiveTab("schemes")}
-          className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
             activeTab === "schemes"
-              ? "bg-primary text-primary-foreground font-semibold"
+              ? "bg-primary text-primary-foreground font-semibold shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
           3 Skema Kuantitatif
         </button>
       </div>
+
+      {/* Tab 0: Sector Picks (Top 5 per Sektor) */}
+      {activeTab === "sector-picks" && (
+        <div className="space-y-4">
+          {/* Sector Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+            <button
+              onClick={() => setSelectedSectorFilter("all")}
+              className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors ${
+                selectedSectorFilter === "all"
+                  ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40"
+                  : "bg-secondary/40 text-muted-foreground hover:text-foreground border border-border/50"
+              }`}
+            >
+              Semua Sektor ({sectorPicks.length})
+            </button>
+            {sectorPicks.map((sec) => (
+              <button
+                key={sec.sectorId}
+                onClick={() => setSelectedSectorFilter(sec.sectorId)}
+                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 ${
+                  selectedSectorFilter === sec.sectorId
+                    ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40"
+                    : "bg-secondary/40 text-muted-foreground hover:text-foreground border border-border/50"
+                }`}
+              >
+                <span>{sec.icon}</span>
+                <span>{sec.sectorName}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Grouped Sector List */}
+          {filteredSectors.map((group) => (
+            <div
+              key={group.sectorId}
+              className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-sm"
+            >
+              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{group.icon}</span>
+                  <h3 className="text-sm font-bold text-foreground">{group.sectorName}</h3>
+                </div>
+                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                  {group.stocks.length} Saham Terpilih AI
+                </span>
+              </div>
+
+              {group.stocks.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2 italic">
+                  Belum ada saham yang memenuhi kriteria likuiditas di sektor ini saat ini.
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {group.stocks.map((stock, idx) => (
+                    <div
+                      key={stock.ticker}
+                      className="rounded-lg border border-border/50 bg-secondary/20 p-3 space-y-2 hover:border-cyan-500/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-muted-foreground/60">
+                            #{idx + 1}
+                          </span>
+                          <span className="text-sm font-bold font-mono text-foreground tracking-tight">
+                            {stock.ticker}
+                          </span>
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                              stock.action === "STRONG BUY"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : stock.action === "BUY"
+                                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                                : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            }`}
+                          >
+                            {stock.action}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold font-mono text-foreground block">
+                            Rp {stock.price.toLocaleString("id-ID")}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-semibold ${
+                              stock.changePct >= 0 ? "text-emerald-400" : "text-rose-400"
+                            }`}
+                          >
+                            {stock.changePct >= 0 ? "+" : ""}{stock.changePct}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono bg-background/40 px-2.5 py-1.5 rounded">
+                        <span>RSI: <strong className="text-foreground">{stock.rsi}</strong></span>
+                        <span>Transaksi: <strong className="text-foreground">{stock.turnoverFormatted}</strong></span>
+                        <span>Skor TV: <strong className="text-cyan-400">+{stock.recommendationScore}</strong></span>
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground/90 leading-snug">
+                        💡 {stock.aiReason}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tab 1: Open Positions */}
       {activeTab === "positions" && (

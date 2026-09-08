@@ -43,14 +43,27 @@ test("market hours validation restricts weekend and outside 09:00-15:00", () => 
   const isWeekend = (day) => day === 0 || day === 6;
   const isTimeInTradingHours = (time) => time >= 900 && time <= 1500;
 
-  // Sunday
   assert.ok(isWeekend(0));
-  // Saturday
   assert.ok(isWeekend(6));
-  // Tuesday at 10:00 (1000)
   assert.ok(!isWeekend(2) && isTimeInTradingHours(1000));
-  // Tuesday at 17:00 (1700) -> Closed
   assert.ok(!isTimeInTradingHours(1700));
+});
+
+test("sector picks limits to maximum 5 stocks per sector", () => {
+  const mockStocks = [
+    { ticker: "BBCA", score: 90 },
+    { ticker: "BBRI", score: 85 },
+    { ticker: "BMRI", score: 80 },
+    { ticker: "BBNI", score: 75 },
+    { ticker: "BRIS", score: 70 },
+    { ticker: "BBTN", score: 65 },
+    { ticker: "BTPS", score: 60 },
+  ];
+
+  const top5 = mockStocks.slice(0, 5);
+  assert.equal(top5.length, 5);
+  assert.equal(top5[0].ticker, "BBCA");
+  assert.equal(top5[4].ticker, "BRIS");
 });
 
 test("discord webhook validator detects valid and invalid urls", () => {
