@@ -607,47 +607,106 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 2: History */}
+      {/* Tab 2: History & Order Log */}
       {activeTab === "history" && (
-        <div className="space-y-2.5">
-          {tradeHistory.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
-              Belum ada transaksi selesai. Posisi akan ditutup otomatis ketika harga live menyentuh Target Profit (+5%) atau Stop Loss (-3%) pada jam perdagangan bursa.
+        <div className="space-y-4">
+          {/* Section: Log Eksekusi Order Beli (Active Orders) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
+                <span>📥</span> Log Eksekusi Pembelian ({openPositions.length} Order Aktif)
+              </span>
+              <span className="text-[10px] text-cyan-400 font-mono bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                STATUS: SEDANG DIHOLD
+              </span>
             </div>
-          ) : (
-            tradeHistory.map((t) => (
-              <div
-                key={t.id}
-                className="rounded-xl border border-border/60 bg-card p-3 space-y-1.5 text-xs shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-foreground font-mono">{t.ticker}</span>
+            {openPositions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                Belum ada eksekusi order beli aktif.
+              </div>
+            ) : (
+              openPositions.map((pos) => (
+                <div
+                  key={`log-${pos.id}`}
+                  className="rounded-xl border border-border/70 bg-card p-3 space-y-1.5 text-xs shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground font-mono">{pos.ticker}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500/15 text-emerald-400 font-mono">
+                        BUY {pos.lots} LOT
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">{pos.entryDate}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+                      HOLD (Target +5% / SL -3%)
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground font-mono flex items-center justify-between">
+                    <span>Harga Masuk: <strong>Rp {pos.entryPrice.toLocaleString("id-ID")}</strong></span>
+                    <span>Total Nilai Beli: <strong>Rp {pos.cost.toLocaleString("id-ID")}</strong></span>
+                    <span className="text-[10px] opacity-80">{pos.schemeName}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Section: Closed Trades (Transaksi Selesai) */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
+                <span>🏁</span> Transaksi Selesai / Closed Trades ({tradeHistory.length})
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                Realized PnL
+              </span>
+            </div>
+            {tradeHistory.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground space-y-1">
+                <p className="text-[11px]">
+                  {openPositions.length > 0
+                    ? `Posisi ${openPositions.map(p => p.ticker).join(" & ")} saat ini masih aktif berjalan di tab `
+                    : "Posisi virtual saat ini berjalan di tab "}
+                  <strong>Posisi Real Aktif</strong> dan akan otomatis tercatat selesai di sini saat menyentuh{" "}
+                  <strong>Target Profit (+5%)</strong> atau <strong>Stop Loss (-3%)</strong> pada jam bursa.
+                </p>
+              </div>
+            ) : (
+              tradeHistory.map((t) => (
+                <div
+                  key={t.id}
+                  className="rounded-xl border border-border/60 bg-card p-3 space-y-1.5 text-xs shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground font-mono">{t.ticker}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                          t.status === "CLOSED_TP"
+                            ? "bg-emerald-500/15 text-emerald-400"
+                            : "bg-rose-500/15 text-rose-400"
+                        }`}
+                      >
+                        {t.status === "CLOSED_TP" ? "TAKE PROFIT" : "STOP LOSS"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">{t.exitDate}</span>
+                    </div>
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                        t.status === "CLOSED_TP"
-                          ? "bg-emerald-500/15 text-emerald-400"
-                          : "bg-rose-500/15 text-rose-400"
+                      className={`font-mono font-bold ${
+                        t.pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
                       }`}
                     >
-                      {t.status === "CLOSED_TP" ? "TAKE PROFIT" : "STOP LOSS"}
+                      {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}% (Rp {t.pnlNominal.toLocaleString("id-ID")})
                     </span>
-                    <span className="text-[10px] text-muted-foreground font-mono">{t.exitDate}</span>
                   </div>
-                  <span
-                    className={`font-mono font-bold ${
-                      t.pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}% (Rp {t.pnlNominal.toLocaleString("id-ID")})
-                  </span>
+                  <div className="text-[11px] text-muted-foreground">
+                    {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Keluar: Rp {t.exitPrice?.toLocaleString("id-ID")} ({t.schemeName})
+                  </div>
                 </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Keluar: Rp {t.exitPrice?.toLocaleString("id-ID")} ({t.schemeName})
-                </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       )}
 

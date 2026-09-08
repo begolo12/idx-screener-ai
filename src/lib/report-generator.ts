@@ -100,6 +100,9 @@ export async function generateAndDispatchMarketReport(
       sectorPicks,
       activeSchemeName: strategyState.activeScheme.name,
       winRate: strategyState.metrics.winRate,
+      portfolio: strategyState.portfolio,
+      openPositions: strategyState.openPositions,
+      tradeHistory: strategyState.tradeHistory,
     });
 
     const sendRes = await sendDiscordWebhook(webhookUrl, {
