@@ -121,11 +121,11 @@ export default function HomePage() {
       {tab === "screener" && (
         <div className="flex-1 flex flex-col pb-28">
           {/* Screener Search Bar */}
-          <div className="px-4 pt-3 pb-1 bg-white">
+          <div className="px-4 pt-3 pb-1.5 bg-white space-y-1.5">
             <div className="relative flex items-center">
               <input
                 type="text"
-                placeholder="Cari kode atau nama saham (BBCA, BUMI...)"
+                placeholder="Cari kode atau nama saham (BBCA, TLKM, Astra...)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition"
@@ -140,6 +140,11 @@ export default function HomePage() {
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+            </div>
+
+            {/* Beginner Friendly Tip */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 px-1 pt-0.5">
+              <span>💡 Sentuh saham untuk melihat rentang harga harian & berita</span>
             </div>
           </div>
 

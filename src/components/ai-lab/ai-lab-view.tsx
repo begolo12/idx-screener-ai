@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, RefreshCw, TrendingUp, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Cpu } from "lucide-react";
+import { Sparkles, RefreshCw, TrendingUp, ShieldCheck, AlertTriangle, CheckCircle2, Clock, Cpu, HelpCircle, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface TradingScheme {
   id: string;
@@ -115,15 +115,8 @@ export function AILabView() {
   const [sectorPicks, setSectorPicks] = useState<SectorPicksGroup[]>([]);
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
-  const [optimizing, setOptimizing] = useState(false);
   const [activeTab, setActiveTab] = useState<"sector-picks" | "positions" | "history" | "schemes">("sector-picks");
-  const [optResult, setOptResult] = useState<{
-    marketIsOpen: boolean;
-    marketMessage: string;
-    newScheme: string;
-    rationale: string;
-    adjustment: string;
-  } | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const loadState = async () => {
     try {
@@ -148,31 +141,11 @@ export function AILabView() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleOptimize = async () => {
-    setOptimizing(true);
-    setOptResult(null);
-    try {
-      const res = await fetch("/api/ai-lab", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setOptResult(data.optimization);
-        setState(data.state);
-        if (data.sectorPicks) {
-          setSectorPicks(data.sectorPicks);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to optimize AI scheme:", err);
-    } finally {
-      setOptimizing(false);
-    }
-  };
-
   if (loading || !state) {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center space-y-3">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-        <p className="text-xs text-slate-500">Memuat Portofolio AI & Data Live TradingView...</p>
+        <p className="text-xs text-slate-500 font-medium">Memuat data portofolio & analisa bursa...</p>
       </div>
     );
   }
@@ -213,7 +186,7 @@ export function AILabView() {
           </div>
         </div>
 
-        <div className="text-[10px] font-medium rounded-lg bg-white/80 border border-slate-200 px-2 py-1 text-slate-600 shrink-0">
+        <div className="text-[10px] font-semibold rounded-lg bg-white/90 border border-slate-200 px-2.5 py-1 text-slate-700 shrink-0">
           Senin - Jumat
         </div>
       </div>
@@ -222,15 +195,24 @@ export function AILabView() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              Total Nilai Portofolio
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Saldo Portofolio
+              </span>
+              <button
+                onClick={() => setShowGuide(!showGuide)}
+                className="text-slate-400 hover:text-blue-600 transition p-0.5"
+                aria-label="Petunjuk Portofolio"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-xl font-bold tabular-nums text-slate-900">
                 Rp {portfolio.totalEquity.toLocaleString("id-ID")}
               </span>
               <span
-                className={`text-xs font-bold tabular-nums px-1.5 py-0.5 rounded-md ${
+                className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded-md ${
                   portfolio.totalProfitNominal >= 0
                     ? "bg-emerald-50 text-emerald-700"
                     : "bg-rose-50 text-rose-700"
@@ -243,27 +225,41 @@ export function AILabView() {
             </div>
           </div>
           <div className="text-right">
-            <span className="text-[10px] text-slate-400 block">Modal Awal</span>
-            <span className="text-xs font-semibold tabular-nums text-slate-600">
+            <span className="text-[10px] text-slate-400 block font-medium">Modal Awal</span>
+            <span className="text-xs font-semibold tabular-nums text-slate-700">
               Rp {portfolio.initialCapital.toLocaleString("id-ID")}
             </span>
           </div>
         </div>
 
+        {/* Breakdown: Saldo Kas vs Dana di Saham */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-            <span className="text-[10px] text-slate-500 block">Sisa Saldo Kas</span>
-            <span className="font-bold tabular-nums text-slate-900 mt-0.5 block">
+          <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-0.5">
+            <span className="text-[10px] font-medium text-slate-500 block">Uang Kas Siap Pakai</span>
+            <span className="font-bold tabular-nums text-slate-900 text-sm block">
               Rp {portfolio.cash.toLocaleString("id-ID")}
             </span>
+            <span className="text-[10px] text-slate-400 block">Dana tunai yang belum dibelikan</span>
           </div>
-          <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-            <span className="text-[10px] text-slate-500 block">Aset Saham (Invested)</span>
-            <span className="font-bold tabular-nums text-blue-700 mt-0.5 block">
+
+          <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-0.5">
+            <span className="text-[10px] font-medium text-slate-500 block">Dana di Saham Aktif</span>
+            <span className="font-bold tabular-nums text-blue-700 text-sm block">
               Rp {portfolio.invested.toLocaleString("id-ID")}
             </span>
+            <span className="text-[10px] text-slate-400 block">Nilai {openPositions.length} saham yang dipegang</span>
           </div>
         </div>
+
+        {/* Beginner Guide Expandable */}
+        {showGuide && (
+          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-slate-700 space-y-1 animate-in fade-in duration-150">
+            <p className="font-bold text-blue-900">Cara Kerja Dompet Simulasi:</p>
+            <p>• Modal simulasi Rp 5.000.000 dialokasikan secara otomatis oleh AI ke 2 saham potensial saat jam bursa.</p>
+            <p>• Jika saham naik mencapai target (+5%), sistem otomatis menjualnya untuk mengunci keuntungan (Take Profit).</p>
+            <p>• Jika saham turun batas rugi (-3%), sistem otomatis menjualnya agar modal tidak tergerus (Stop Loss).</p>
+          </div>
+        )}
       </div>
 
       {/* AI Strategy Engine Header */}
@@ -275,29 +271,29 @@ export function AILabView() {
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                AI Strategy Lab & Bandarmologi
+                Sistem Analisis Mandiri (AI Self-Learning)
               </h2>
               <p className="text-[11px] text-slate-500">
-                Skema Berjalan: <strong className="text-blue-600 font-bold">{activeScheme.name}</strong> (TP +{activeScheme.targetProfitPct}% / SL -{activeScheme.stopLossPct}%)
+                Strategi: <strong className="text-blue-600 font-bold">{activeScheme.name}</strong> (Untung +{activeScheme.targetProfitPct}% / Pengaman -{activeScheme.stopLossPct}%)
               </p>
             </div>
           </div>
 
           {/* Autonomous Status Badge (Non-clickable, AI Self-Learning) */}
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-[10px] font-bold">
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-              Otonom (Self-Learning)
+              Otonom (Otomatis)
             </span>
             <span className="text-[10px] text-slate-500 font-medium tabular-nums">
-              Target: <strong className="text-emerald-700 font-bold">95% Winrate</strong>
+              Target Akurasi: <strong className="text-emerald-700 font-bold">95% Winrate</strong>
             </span>
           </div>
         </div>
 
         {/* Alasan Pemilihan & Status Berjalan */}
         <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
-          {state.metrics.aiRationale}
+          💡 {state.metrics.aiRationale}
         </p>
       </div>
 
@@ -307,18 +303,18 @@ export function AILabView() {
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-600" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-              Mekanisme Skema & Logika AI
+              Penjelasan Cara Kerja Strategi AI
             </h3>
           </div>
           <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            {state.aiLearning?.status || "MEMPERTAHANKAN SKEMA"}
+            {state.aiLearning?.status || "STRATEGI BERJALAN OPTIMAL"}
           </span>
         </div>
 
         {/* Cara Kerja Skema Aktif */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium">Cara Kerja Skema Saat Ini:</span>
+            <span className="text-slate-500 font-medium">Strategi Saat Ini:</span>
             <span className="text-[11px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
               {activeScheme.name}
             </span>
@@ -336,57 +332,33 @@ export function AILabView() {
               Kapan AI Tetap
             </span>
             <p className="text-[11px] text-emerald-950 leading-snug">
-              {state.aiLearning?.whenHold || "Winrate konsisten ≥ 75% & IHSG sejalan dengan momentum volume."}
+              {state.aiLearning?.whenHold || "Tingkat kemenangan konsisten ≥ 75% & pasar mendukung kenaikan harga."}
             </p>
           </div>
 
           <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
             <span className="text-[10px] font-bold text-amber-800 flex items-center gap-1 uppercase tracking-wider">
               <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-              Kapan AI Ganti Skema
+              Kapan AI Ganti Strategi
             </span>
             <p className="text-[11px] text-amber-950 leading-snug">
-              {state.aiLearning?.whenRotate || "Terdeteksi 2x Stop Loss berturut-turut atau regim pasar bergeser."}
+              {state.aiLearning?.whenRotate || "Terjadi 2x rugi berturut-turut atau pola pasar berubah drastis."}
             </p>
           </div>
         </div>
 
         {/* Kriteria Adaptif */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-          <span>Target Akurasi: <strong className="text-emerald-700 font-bold">95%</strong> (Terkini: {state.metrics.winRate}%)</span>
+          <span>Target Keberhasilan: <strong className="text-emerald-700 font-bold">95%</strong> (Terkini: {state.metrics.winRate}%)</span>
           <span className="text-slate-400 font-medium">Evaluasi Real-time</span>
         </div>
       </div>
 
-      {/* Optimization Result Alert */}
-      {optResult && (
-        <div
-          className={`rounded-2xl border p-3 text-xs space-y-1 ${
-            optResult.marketIsOpen
-              ? "border-blue-200 bg-blue-50 text-blue-900"
-              : "border-amber-200 bg-amber-50 text-amber-900"
-          }`}
-        >
-          <div className="font-semibold flex items-center gap-1.5">
-            <span>Hasil Evaluasi:</span>
-            {!optResult.marketIsOpen && (
-              <span className="text-[10px] bg-amber-200/80 text-amber-800 px-1.5 py-0.2 rounded font-medium">
-                Pasar Tutup
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] opacity-90">{optResult.marketMessage}</p>
-          <div className="text-[11px] font-semibold text-blue-700 mt-1">
-            Parameter Rekomendasi: {optResult.adjustment}
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Sub-Tabs (Segmented Control) */}
+      {/* Navigation Sub-Tabs (Segmented Control yang Ramah Pemula) */}
       <div className="p-1 bg-slate-100 rounded-xl flex gap-1 text-xs">
         <button
           onClick={() => setActiveTab("sector-picks")}
-          className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "sector-picks"
               ? "bg-white text-blue-600 shadow-xs"
               : "text-slate-600 hover:text-slate-900"
@@ -396,17 +368,17 @@ export function AILabView() {
         </button>
         <button
           onClick={() => setActiveTab("positions")}
-          className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "positions"
               ? "bg-white text-blue-600 shadow-xs"
               : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          Posisi ({openPositions.length})
+          Saham Dimiliki ({openPositions.length})
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "history"
               ? "bg-white text-blue-600 shadow-xs"
               : "text-slate-600 hover:text-slate-900"
@@ -416,17 +388,17 @@ export function AILabView() {
         </button>
         <button
           onClick={() => setActiveTab("schemes")}
-          className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition ${
+          className={`flex-1 py-2 rounded-lg text-center font-semibold transition ${
             activeTab === "schemes"
               ? "bg-white text-blue-600 shadow-xs"
               : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          Aturan
+          Pilihan Strategi
         </button>
       </div>
 
-      {/* Tab 0: Sector Picks (Top Sektor) */}
+      {/* Tab 0: Sector Picks (Rekomendasi Pilihan AI per Sektor) */}
       {activeTab === "sector-picks" && (
         <div className="space-y-3">
           {/* Sector Filter Chips */}
@@ -509,7 +481,13 @@ export function AILabView() {
                                   : "bg-amber-100 text-amber-800"
                               }`}
                             >
-                              {stock.action}
+                              {stock.action === "STRONG BUY"
+                                ? "SANGAT BAGUS"
+                                : stock.action === "BUY"
+                                ? "BAGUS DIBELI"
+                                : stock.action === "ACCUMULATE"
+                                ? "AKUMULASI"
+                                : "HINDARI (RAWAN GUYUR)"}
                             </span>
                           </div>
                           <div className="text-right">
@@ -531,7 +509,7 @@ export function AILabView() {
                         {stock.brokerSummary && (
                           <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] bg-white p-2 rounded-lg border border-slate-200/80">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-slate-500">Top Buyer:</span>
+                              <span className="text-slate-500">Pembeli Terbanyak:</span>
                               <div className="flex items-center gap-1">
                                 {stock.brokerSummary.topBuyers.map((code) => (
                                   <span
@@ -560,17 +538,16 @@ export function AILabView() {
                               }`}
                             >
                               {isMg
-                                ? "Scalper Dominan"
+                                ? "Trader Kilat Dominan"
                                 : isSmartMoney
-                                ? "Smart Money Inflow"
-                                : "Retail Flow"}
+                                ? "Investor Asing Masuk"
+                                : "Investor Ritel Masuk"}
                             </span>
                           </div>
                         )}
 
                         <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                          <span>RSI: <strong className="text-slate-800">{stock.rsi}</strong></span>
-                          <span>Nilai: <strong className="text-slate-800">{stock.turnoverFormatted}</strong></span>
+                          <span>Nilai Transaksi: <strong className="text-slate-800">{stock.turnoverFormatted}</strong></span>
                           <span>Skor AI: <strong className="text-blue-600">+{stock.recommendationScore}</strong></span>
                         </div>
 
@@ -587,37 +564,48 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 1: Open Positions */}
+      {/* Tab 1: Open Positions (Saham yang Sedang Dimiliki) */}
       {activeTab === "positions" && (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {openPositions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 bg-white">
-              Tidak ada posisi aktif saat ini. AI memindai sinyal baru secara otomatis pada jam bursa (Senin-Jumat 09:00 - 15:00 WIB).
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 bg-white space-y-1.5">
+              <p className="font-bold text-slate-700">Belum Ada Saham yang Sedang Dimiliki</p>
+              <p className="leading-relaxed">
+                AI akan secara otomatis membelikan saham terbaik menggunakan modal kas saat jam bursa resmi dibuka (Senin - Jumat 09:00 - 15:00 WIB).
+              </p>
             </div>
           ) : (
             openPositions.map((pos) => (
               <div
                 key={pos.id}
-                className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-xs"
+                className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs"
               >
+                {/* Header Saham & Untung/Rugi Berjalan */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-slate-900">{pos.ticker}</span>
-                    <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                      {pos.lots} LOT ({pos.shares} Lbr)
+                    <span className="font-bold text-base text-slate-900">{pos.ticker}</span>
+                    <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                      {pos.lots} LOT ({pos.shares.toLocaleString("id-ID")} Lembar)
                     </span>
                   </div>
                   <div className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {pos.pnlPct >= 0 ? (
+                        <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-rose-600" />
+                      )}
+                      <span
+                        className={`text-sm font-bold tabular-nums ${
+                          pos.pnlPct >= 0 ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        {pos.pnlPct >= 0 ? "+" : ""}
+                        {pos.pnlPct}%
+                      </span>
+                    </div>
                     <span
-                      className={`text-sm font-bold tabular-nums ${
-                        pos.pnlPct >= 0 ? "text-emerald-700" : "text-rose-700"
-                      }`}
-                    >
-                      {pos.pnlPct >= 0 ? "+" : ""}
-                      {pos.pnlPct}%
-                    </span>
-                    <span
-                      className={`text-[10px] block tabular-nums ${
+                      className={`text-[11px] block tabular-nums font-semibold ${
                         pos.pnlNominal >= 0 ? "text-emerald-600" : "text-rose-600"
                       }`}
                     >
@@ -626,26 +614,45 @@ export function AILabView() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Modal Masuk:</span>
-                    <span className="text-slate-800 font-semibold">Rp {pos.cost.toLocaleString("id-ID")}</span>
-                    <span className="text-[10px] text-slate-400 block">(@{pos.entryPrice})</span>
+                {/* Rincian Harga Pembelian & Harga Sekarang */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-slate-400 text-[10px] block font-medium">Modal Pembelian:</span>
+                    <span className="text-slate-800 font-bold block mt-0.5">
+                      Rp {pos.cost.toLocaleString("id-ID")}
+                    </span>
+                    <span className="text-[10px] text-slate-500">(@ Rp {pos.entryPrice.toLocaleString("id-ID")} / lembar)</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Nilai Terkini:</span>
-                    <span className="text-slate-800 font-semibold">Rp {pos.currentValue.toLocaleString("id-ID")}</span>
-                    <span className="text-[10px] text-slate-400 block">(@{pos.currentPrice})</span>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-slate-400 text-[10px] block font-medium">Nilai Saat Ini:</span>
+                    <span className="text-slate-800 font-bold block mt-0.5">
+                      Rp {pos.currentValue.toLocaleString("id-ID")}
+                    </span>
+                    <span className="text-[10px] text-slate-500">(@ Rp {pos.currentPrice.toLocaleString("id-ID")} / lembar)</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">TP / SL:</span>
-                    <span className="text-emerald-700 font-semibold">{pos.targetPrice}</span> /{" "}
-                    <span className="text-rose-700 font-semibold">{pos.stopLossPrice}</span>
+                </div>
+
+                {/* Target Otomatis Take Profit & Stop Loss */}
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-800 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Target Jual Untung (+5%):
+                    </span>
+                    <strong className="text-emerald-700">Rp {pos.targetPrice.toLocaleString("id-ID")}</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-rose-800 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                      Batas Pengaman Rugi (-3%):
+                    </span>
+                    <strong className="text-rose-700">Rp {pos.stopLossPrice.toLocaleString("id-ID")}</strong>
                   </div>
                 </div>
 
                 <p className="text-[11px] text-slate-500 leading-snug px-1">
-                  {pos.rationale}
+                  💡 {pos.rationale}
                 </p>
               </div>
             ))
@@ -653,34 +660,34 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 2: History & Order Log */}
+      {/* Tab 2: History & Order Log (Riwayat Pembelian & Penjualan) */}
       {activeTab === "history" && (
         <div className="space-y-4">
           {/* Active Orders Log */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">
-                Log Eksekusi Pembelian ({openPositions.length} Posisi)
+                Saham yang Sedang Dipegang ({openPositions.length} Posisi)
               </span>
-              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                HOLD
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                STATUS: SEDANG BERJALAN
               </span>
             </div>
             {openPositions.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 bg-white">
-                Belum ada eksekusi order beli aktif.
+                Belum ada saham yang sedang dipegang.
               </div>
             ) : (
               openPositions.map((pos) => (
                 <div
                   key={`log-${pos.id}`}
-                  className="rounded-2xl border border-slate-200 bg-white p-3 space-y-1.5 text-xs shadow-xs"
+                  className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2 text-xs shadow-xs"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{pos.ticker}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold bg-emerald-50 text-emerald-800">
-                        BUY {pos.lots} LOT
+                      <span className="font-bold text-slate-900 text-sm">{pos.ticker}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-800">
+                        BELI {pos.lots} LOT
                       </span>
                       <span className="text-[10px] text-slate-400">{pos.entryDate}</span>
                     </div>
@@ -689,8 +696,8 @@ export function AILabView() {
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-50">
-                    <span>Masuk: <strong className="text-slate-800">Rp {pos.entryPrice.toLocaleString("id-ID")}</strong></span>
-                    <span>Total: <strong className="text-slate-800">Rp {pos.cost.toLocaleString("id-ID")}</strong></span>
+                    <span>Harga Beli: <strong className="text-slate-800">Rp {pos.entryPrice.toLocaleString("id-ID")}</strong></span>
+                    <span>Total Biaya: <strong className="text-slate-800">Rp {pos.cost.toLocaleString("id-ID")}</strong></span>
                   </div>
                 </div>
               ))
@@ -701,36 +708,36 @@ export function AILabView() {
           <div className="space-y-2 pt-2 border-t border-slate-200">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">
-                Transaksi Selesai ({tradeHistory.length})
+                Transaksi Selesai & Realized Profit ({tradeHistory.length})
               </span>
-              <span className="text-[10px] text-slate-400">Realized PnL</span>
+              <span className="text-[10px] text-slate-400 font-medium">Hasil Penjualan</span>
             </div>
             {tradeHistory.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 bg-white leading-relaxed">
-                Posisi aktif saat ini berjalan di tab <strong>Posisi</strong> dan akan tercatat selesai di sini otomatis saat menyentuh Target Profit (+5%) atau Stop Loss (-3%).
+              <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 bg-white leading-relaxed">
+                Saham yang sedang aktif dipegang ({openPositions.map(p => p.ticker).join(", ") || "posisi terbuka"}) akan otomatis tercatat selesai di sini saat menyentuh <strong>Target Untung (+5%)</strong> atau <strong>Batas Rugi (-3%)</strong> pada jam bursa.
               </div>
             ) : (
               tradeHistory.map((t) => (
                 <div
                   key={t.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-3 space-y-1.5 text-xs shadow-xs"
+                  className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-1.5 text-xs shadow-xs"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{t.ticker}</span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
                           t.status === "CLOSED_TP"
                             ? "bg-emerald-50 text-emerald-800"
                             : "bg-rose-50 text-rose-800"
                         }`}
                       >
-                        {t.status === "CLOSED_TP" ? "TAKE PROFIT" : "STOP LOSS"}
+                        {t.status === "CLOSED_TP" ? "JUAL UNTUNG (+5%)" : "JUAL BATAS RUGI (-3%)"}
                       </span>
                       <span className="text-[10px] text-slate-400">{t.exitDate}</span>
                     </div>
                     <span
-                      className={`tabular-nums font-bold ${
+                      className={`tabular-nums font-bold text-sm ${
                         t.pnlPct >= 0 ? "text-emerald-700" : "text-rose-700"
                       }`}
                     >
@@ -738,7 +745,7 @@ export function AILabView() {
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Jual: Rp {t.exitPrice?.toLocaleString("id-ID")}
+                    Beli {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Dijual: Rp {t.exitPrice?.toLocaleString("id-ID")}
                   </div>
                 </div>
               ))
@@ -747,13 +754,13 @@ export function AILabView() {
         </div>
       )}
 
-      {/* Tab 3: Schemes */}
+      {/* Tab 3: Schemes (Daftar Strategi AI) */}
       {activeTab === "schemes" && (
         <div className="space-y-3">
           {availableSchemes.map((s) => (
             <div
               key={s.id}
-              className={`rounded-2xl border p-3.5 space-y-2 transition ${
+              className={`rounded-2xl border p-4 space-y-2 transition ${
                 s.id === activeScheme.id
                   ? "border-blue-300 bg-blue-50/50 shadow-xs"
                   : "border-slate-200 bg-white"
@@ -763,18 +770,18 @@ export function AILabView() {
                 <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2">
                   {s.name}
                   {s.id === activeScheme.id && (
-                    <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md font-semibold">
-                      Aktif Berjalan
+                    <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md font-bold">
+                      Sedang Aktif Dipakai
                     </span>
                   )}
                 </h4>
-                <span className="text-[11px] font-semibold text-slate-600">
-                  TP +{s.targetProfitPct}% / SL -{s.stopLossPct}%
+                <span className="text-[11px] font-bold text-slate-700">
+                  Target Untung +{s.targetProfitPct}% / Pengaman -{s.stopLossPct}%
                 </span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">{s.description}</p>
-              <div className="text-[11px] text-blue-800 bg-blue-50 p-2.5 rounded-xl border border-blue-100">
-                Aturan: {s.rule}
+              <div className="text-[11px] text-blue-900 bg-blue-50 p-2.5 rounded-xl border border-blue-100">
+                <strong>Aturan Logika:</strong> {s.rule}
               </div>
             </div>
           ))}
