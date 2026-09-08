@@ -16,12 +16,17 @@ interface PaperTrade {
   ticker: string;
   name: string;
   type: "BUY";
+  lots: number;
+  shares: number;
   entryPrice: number;
   currentPrice: number;
   exitPrice?: number;
+  cost: number;
+  currentValue: number;
+  pnlNominal: number;
+  pnlPct: number;
   targetPrice: number;
   stopLossPrice: number;
-  pnlPct: number;
   status: "OPEN" | "CLOSED_TP" | "CLOSED_SL";
   schemeName: string;
   entryDate: string;
@@ -29,7 +34,27 @@ interface PaperTrade {
   rationale: string;
 }
 
+interface MarketScheduleStatus {
+  isOpen: boolean;
+  isWeekend: boolean;
+  statusText: string;
+  sessionText: string;
+  nextOpenText: string;
+  currentWIBTime: string;
+}
+
+interface PortfolioBalance {
+  initialCapital: number;
+  cash: number;
+  invested: number;
+  totalEquity: number;
+  totalProfitNominal: number;
+  totalProfitPct: number;
+}
+
 interface StrategyLabState {
+  marketStatus: MarketScheduleStatus;
+  portfolio: PortfolioBalance;
   activeScheme: TradingScheme;
   availableSchemes: TradingScheme[];
   metrics: {
@@ -50,7 +75,13 @@ export function AILabView() {
   const [loading, setLoading] = useState(true);
   const [optimizing, setOptimizing] = useState(false);
   const [activeTab, setActiveTab] = useState<"positions" | "history" | "schemes">("positions");
-  const [optResult, setOptResult] = useState<{ newScheme: string; rationale: string; adjustment: string } | null>(null);
+  const [optResult, setOptResult] = useState<{
+    marketIsOpen: boolean;
+    marketMessage: string;
+    newScheme: string;
+    rationale: string;
+    adjustment: string;
+  } | null>(null);
 
   const loadState = async () => {
     try {
@@ -98,10 +129,88 @@ export function AILabView() {
     );
   }
 
-  const { metrics, activeScheme, openPositions, tradeHistory, availableSchemes } = state;
+  const { marketStatus, portfolio, activeScheme, openPositions, tradeHistory, availableSchemes } = state;
 
   return (
     <div className="space-y-4 pb-20">
+      {/* Real-time Market Hours Banner */}
+      <div
+        className={`rounded-xl border p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 transition-colors ${
+          marketStatus.isOpen
+            ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-300"
+            : "border-rose-500/30 bg-rose-950/20 text-rose-300"
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <span
+            className={`inline-flex h-3 w-3 rounded-full ${
+              marketStatus.isOpen ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
+            }`}
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold font-mono tracking-wide uppercase">
+                {marketStatus.statusText}
+              </span>
+              <span className="text-[11px] opacity-80">({marketStatus.currentWIBTime})</span>
+            </div>
+            <p className="text-[11px] opacity-90 mt-0.5">
+              {marketStatus.sessionText} • {marketStatus.nextOpenText}
+            </p>
+          </div>
+        </div>
+
+        <div className="text-[10px] font-mono rounded bg-background/50 border border-border/50 px-2 py-1 self-start sm:self-auto text-foreground">
+          Jam Perdagangan: Senin - Jumat (09:00 - 15:00 WIB)
+        </div>
+      </div>
+
+      {/* Portfolio Virtual Capital Card (Rp 5.000.000) */}
+      <div className="rounded-xl border border-border/80 bg-card p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+              Modal Virtual Trading
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-xl font-bold font-mono text-foreground">
+                Rp {portfolio.totalEquity.toLocaleString("id-ID")}
+              </span>
+              <span
+                className={`text-xs font-bold font-mono ${
+                  portfolio.totalProfitNominal >= 0 ? "text-emerald-400" : "text-rose-400"
+                }`}
+              >
+                {portfolio.totalProfitNominal >= 0 ? "+" : ""}Rp {portfolio.totalProfitNominal.toLocaleString("id-ID")} (
+                {portfolio.totalProfitPct >= 0 ? "+" : ""}
+                {portfolio.totalProfitPct}%)
+              </span>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-muted-foreground block font-mono">Modal Pokok</span>
+            <span className="text-xs font-semibold font-mono text-foreground">
+              Rp {portfolio.initialCapital.toLocaleString("id-ID")}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+          <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block">Sisa Saldo Kas</span>
+            <span className="font-bold text-foreground mt-0.5 block">
+              Rp {portfolio.cash.toLocaleString("id-ID")}
+            </span>
+          </div>
+          <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/40">
+            <span className="text-[10px] text-muted-foreground block">Dana di Saham (Invested)</span>
+            <span className="font-bold text-cyan-400 mt-0.5 block">
+              Rp {portfolio.invested.toLocaleString("id-ID")}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Top Header Card */}
       <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/5 p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -112,11 +221,11 @@ export function AILabView() {
                 Adaptive AI Engine • DeepSeek
               </span>
             </div>
-            <h2 className="text-lg font-bold text-foreground tracking-tight mt-1">
+            <h2 className="text-base font-bold text-foreground tracking-tight mt-1">
               AI Strategy Lab & Paper Trading
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-              Sistem simulasi otomatis yang mengevaluasi skema trading kuantitatif, merotasi strategi saat performa turun, dan mencatat eksekusi beli/jual secara virtual.
+              Mengevaluasi skema kuantitatif, merotasi strategi saat performa turun, dan mengeksekusi lot saham pada jam buka bursa.
             </p>
           </div>
 
@@ -142,69 +251,45 @@ export function AILabView() {
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="rounded-xl border border-border/80 bg-card p-3 shadow-sm">
-          <span className="text-[11px] text-muted-foreground font-medium">Winrate Simulasi</span>
-          <div className="flex items-baseline gap-1 mt-1">
-            <span className={`text-xl font-bold font-mono ${metrics.winRate >= 60 ? "text-emerald-400" : "text-amber-400"}`}>
-              {metrics.winRate}%
-            </span>
-            <span className="text-[10px] text-muted-foreground">({metrics.winCount}W / {metrics.lossCount}L)</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/80 bg-card p-3 shadow-sm">
-          <span className="text-[11px] text-muted-foreground font-medium">Total PnL Simulasi</span>
-          <div className="flex items-baseline gap-1 mt-1">
-            <span className={`text-xl font-bold font-mono ${metrics.cumulativePnlPct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-              {metrics.cumulativePnlPct >= 0 ? "+" : ""}{metrics.cumulativePnlPct}%
-            </span>
-            <span className="text-[10px] text-muted-foreground">kumulatif</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/80 bg-card p-3 shadow-sm">
-          <span className="text-[11px] text-muted-foreground font-medium">Skema Aktif</span>
-          <div className="mt-1">
-            <span className="text-xs font-semibold text-cyan-400 block truncate" title={activeScheme.name}>
-              {activeScheme.name}
-            </span>
-            <span className="text-[10px] text-muted-foreground">TP +{activeScheme.targetProfitPct}% / SL -{activeScheme.stopLossPct}%</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/80 bg-card p-3 shadow-sm">
-          <span className="text-[11px] text-muted-foreground font-medium">Trade Virtual</span>
-          <div className="flex items-baseline gap-1 mt-1">
-            <span className="text-xl font-bold font-mono text-foreground">{metrics.totalTrades}</span>
-            <span className="text-[10px] text-muted-foreground">({openPositions.length} aktif)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Reasoning Box */}
-      <div className="rounded-xl border border-border/70 bg-card p-3.5 space-y-2 shadow-sm">
+      {/* Scheme Info Card */}
+      <div className="rounded-xl border border-border/80 bg-card p-3.5 space-y-1.5 shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-foreground">Rasional AI Quant (DeepSeek)</span>
-            <span className="text-[10px] bg-secondary px-2 py-0.5 rounded text-muted-foreground font-mono">
-              Evaluasi: {metrics.lastEvaluationDate}
+          <span className="text-xs font-bold text-cyan-400 flex items-center gap-2">
+            Skema Aktif: {activeScheme.name}
+            <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-mono">
+              TARGET +{activeScheme.targetProfitPct}% / SL -{activeScheme.stopLossPct}%
             </span>
-          </div>
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono">
+            {openPositions.length} Posisi Aktif
+          </span>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed italic bg-secondary/20 p-2.5 rounded-lg border border-border/40">
-          &ldquo;{metrics.aiRationale}&rdquo;
+          &ldquo;{state.metrics.aiRationale}&rdquo;
         </p>
       </div>
 
-      {/* Notification if optimization just ran */}
+      {/* Optimization Result Alert */}
       {optResult && (
-        <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs space-y-1 text-cyan-200">
-          <div className="font-semibold text-cyan-400">Hasil Evaluasi DeepSeek:</div>
-          <div>Skema Terpilih: <strong>{optResult.newScheme}</strong></div>
-          <div className="text-[11px] text-cyan-300/80">{optResult.rationale}</div>
-          <div className="text-[10px] font-mono text-cyan-400 mt-1">Parameter: {optResult.adjustment}</div>
+        <div
+          className={`rounded-xl border p-3 text-xs space-y-1 ${
+            optResult.marketIsOpen
+              ? "border-cyan-500/30 bg-cyan-950/20 text-cyan-200"
+              : "border-amber-500/30 bg-amber-950/20 text-amber-200"
+          }`}
+        >
+          <div className="font-semibold flex items-center gap-1.5">
+            <span>Hasil Evaluasi DeepSeek:</span>
+            {!optResult.marketIsOpen && (
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                PASAR TUTUP
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] opacity-90">{optResult.marketMessage}</p>
+          <div className="text-[10px] font-mono text-cyan-400 mt-1">
+            Parameter Rekomendasi: {optResult.adjustment}
+          </div>
         </div>
       )}
 
@@ -218,7 +303,7 @@ export function AILabView() {
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Posisi Virtual Aktif ({openPositions.length})
+          Posisi Real Aktif ({openPositions.length})
         </button>
         <button
           onClick={() => setActiveTab("history")}
@@ -238,7 +323,7 @@ export function AILabView() {
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Daftar 3 Skema AI
+          3 Skema Kuantitatif
         </button>
       </div>
 
@@ -247,19 +332,19 @@ export function AILabView() {
         <div className="space-y-2.5">
           {openPositions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
-              Tidak ada posisi aktif saat ini. AI sedang memindai sinyal beli baru dari TradingView Scanner...
+              Tidak ada posisi aktif saat ini. AI akan memindai kandidat baru saat bursa buka (Senin-Jumat 09:00 - 15:00 WIB).
             </div>
           ) : (
             openPositions.map((pos) => (
               <div
                 key={pos.id}
-                className="rounded-xl border border-border/80 bg-card p-3.5 space-y-2 hover:border-primary/40 transition-colors shadow-sm"
+                className="rounded-xl border border-border/80 bg-card p-3.5 space-y-2.5 hover:border-primary/40 transition-colors shadow-sm"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm text-foreground font-mono">{pos.ticker}</span>
-                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      VIRTUAL BUY
+                    <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-mono">
+                      {pos.lots} LOT ({pos.shares} LEMBAR)
                     </span>
                     <span className="text-[10px] text-muted-foreground hidden sm:inline">{pos.name}</span>
                   </div>
@@ -271,20 +356,27 @@ export function AILabView() {
                     >
                       {pos.pnlPct >= 0 ? "+" : ""}{pos.pnlPct}%
                     </span>
+                    <span
+                      className={`text-[10px] font-mono block ${
+                        pos.pnlNominal >= 0 ? "text-emerald-400/90" : "text-rose-400/90"
+                      }`}
+                    >
+                      {pos.pnlNominal >= 0 ? "+" : ""}Rp {pos.pnlNominal.toLocaleString("id-ID")}
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[11px] bg-secondary/30 p-2 rounded-lg font-mono">
+                <div className="grid grid-cols-3 gap-2 text-[11px] bg-secondary/30 p-2.5 rounded-lg font-mono">
                   <div>
-                    <span className="text-muted-foreground text-[10px] block">Entry:</span>
-                    Rp {pos.entryPrice.toLocaleString("id-ID")}
+                    <span className="text-muted-foreground text-[10px] block">Modal Beli:</span>
+                    Rp {pos.cost.toLocaleString("id-ID")} (@{pos.entryPrice})
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-[10px] block">Harga Live:</span>
-                    Rp {pos.currentPrice.toLocaleString("id-ID")}
+                    <span className="text-muted-foreground text-[10px] block">Nilai Sekarang:</span>
+                    Rp {pos.currentValue.toLocaleString("id-ID")} (@{pos.currentPrice})
                   </div>
                   <div>
-                    <span className="text-muted-foreground text-[10px] block">Target / SL:</span>
+                    <span className="text-muted-foreground text-[10px] block">TP / SL:</span>
                     <span className="text-emerald-400">{pos.targetPrice}</span> /{" "}
                     <span className="text-rose-400">{pos.stopLossPrice}</span>
                   </div>
@@ -302,38 +394,44 @@ export function AILabView() {
       {/* Tab 2: History */}
       {activeTab === "history" && (
         <div className="space-y-2.5">
-          {tradeHistory.map((t) => (
-            <div
-              key={t.id}
-              className="rounded-xl border border-border/60 bg-card p-3 space-y-1.5 text-xs shadow-sm"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-foreground font-mono">{t.ticker}</span>
+          {tradeHistory.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+              Belum ada transaksi selesai. Posisi akan ditutup otomatis ketika harga live menyentuh Target Profit (+5%) atau Stop Loss (-3%) pada jam perdagangan bursa.
+            </div>
+          ) : (
+            tradeHistory.map((t) => (
+              <div
+                key={t.id}
+                className="rounded-xl border border-border/60 bg-card p-3 space-y-1.5 text-xs shadow-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-foreground font-mono">{t.ticker}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        t.status === "CLOSED_TP"
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : "bg-rose-500/15 text-rose-400"
+                      }`}
+                    >
+                      {t.status === "CLOSED_TP" ? "TAKE PROFIT" : "STOP LOSS"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{t.exitDate}</span>
+                  </div>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                      t.status === "CLOSED_TP"
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-rose-500/15 text-rose-400"
+                    className={`font-mono font-bold ${
+                      t.pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                   >
-                    {t.status === "CLOSED_TP" ? "TAKE PROFIT" : "STOP LOSS"}
+                    {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}% (Rp {t.pnlNominal.toLocaleString("id-ID")})
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-mono">{t.exitDate}</span>
                 </div>
-                <span
-                  className={`font-mono font-bold ${
-                    t.pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct}%
-                </span>
+                <div className="text-[11px] text-muted-foreground">
+                  {t.lots} Lot @ Rp {t.entryPrice.toLocaleString("id-ID")} → Keluar: Rp {t.exitPrice?.toLocaleString("id-ID")} ({t.schemeName})
+                </div>
               </div>
-              <div className="text-[11px] text-muted-foreground">
-                Beli: Rp {t.entryPrice.toLocaleString("id-ID")} → Keluar: Rp {t.exitPrice?.toLocaleString("id-ID")} ({t.schemeName})
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
 

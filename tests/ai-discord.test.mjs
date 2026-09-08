@@ -23,22 +23,34 @@ test("buildMarketReportDiscordEmbed creates valid embed structure", () => {
   assert.ok(embed.footer.text.includes("IDX Screener"));
 });
 
-test("paper trading metrics compute winrate correctly", () => {
-  const trades = [
-    { ticker: "BBCA", pnlPct: 4.5 },
-    { ticker: "BBRI", pnlPct: 3.2 },
-    { ticker: "TLKM", pnlPct: -2.1 },
-    { ticker: "ASII", pnlPct: 5.0 },
-  ];
+test("portfolio 5 million calculates lots and equity accurately", () => {
+  const initialCapital = 5_000_000;
+  const price = 6675; // BBCA
+  const pricePerLot = price * 100; // 667,500
+  const lots = Math.floor(2_000_000 / pricePerLot); // 2 lot
+  const cost = lots * pricePerLot; // 1,335,000
+  const cash = initialCapital - cost; // 3,665,000
+  const currentValue = lots * 100 * price; // 1,335,000
+  const totalEquity = cash + currentValue; // 5,000,000
 
-  const wins = trades.filter(t => t.pnlPct > 0).length;
-  const total = trades.length;
-  const winRate = Number(((wins / total) * 100).toFixed(1));
-  const cumulativePnl = Number(trades.reduce((acc, t) => acc + t.pnlPct, 0).toFixed(2));
+  assert.equal(lots, 2);
+  assert.equal(cost, 1_335_000);
+  assert.equal(cash, 3_665_000);
+  assert.equal(totalEquity, 5_000_000);
+});
 
-  assert.equal(wins, 3);
-  assert.equal(winRate, 75.0);
-  assert.equal(cumulativePnl, 10.6);
+test("market hours validation restricts weekend and outside 09:00-15:00", () => {
+  const isWeekend = (day) => day === 0 || day === 6;
+  const isTimeInTradingHours = (time) => time >= 900 && time <= 1500;
+
+  // Sunday
+  assert.ok(isWeekend(0));
+  // Saturday
+  assert.ok(isWeekend(6));
+  // Tuesday at 10:00 (1000)
+  assert.ok(!isWeekend(2) && isTimeInTradingHours(1000));
+  // Tuesday at 17:00 (1700) -> Closed
+  assert.ok(!isTimeInTradingHours(1700));
 });
 
 test("discord webhook validator detects valid and invalid urls", () => {
