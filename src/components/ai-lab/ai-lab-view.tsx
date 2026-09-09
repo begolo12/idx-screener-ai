@@ -47,6 +47,7 @@ interface PaperTrade {
   ticker: string;
   name: string;
   type: "BUY";
+  category?: "BLUECHIP_60" | "SCALPING_40";
   lots: number;
   shares: number;
   entryPrice: number;
@@ -86,6 +87,13 @@ interface PortfolioBalance {
   totalEquity: number;
   totalProfitNominal: number;
   totalProfitPct: number;
+  bluechipInvested?: number;
+  scalpingInvested?: number;
+  bluechipTargetPct?: number;
+  scalpingTargetPct?: number;
+  bluechipPct?: number;
+  scalpingPct?: number;
+  idleCashPct?: number;
 }
 
 interface SectorPickStock {
@@ -272,32 +280,82 @@ export function AILabView() {
           </div>
         </div>
 
-        {/* Breakdown: Saldo Kas vs Dana di Saham */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-0.5">
-            <span className="text-[10px] font-medium text-slate-500 block">Uang Kas Siap Pakai</span>
-            <span className="font-bold tabular-nums text-slate-900 text-sm block">
-              Rp {portfolio.cash.toLocaleString("id-ID")}
+        {/* Skema Alokasi Portofolio: 60% Bluechip + 40% High Risk Scalping */}
+        <div className="space-y-2 pt-1 border-t border-slate-100">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-bold text-slate-800 flex items-center gap-1">
+              ⚖️ Alokasi Modal Portofolio
             </span>
-            <span className="text-[10px] text-slate-400 block">Dana tunai yang belum dibelikan</span>
+            <span className="text-[10px] font-semibold text-slate-500">
+              60% Bluechip • 40% Scalping
+            </span>
           </div>
 
-          <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-0.5">
-            <span className="text-[10px] font-medium text-slate-500 block">Dana di Saham Aktif</span>
-            <span className="font-bold tabular-nums text-blue-700 text-sm block">
-              Rp {portfolio.invested.toLocaleString("id-ID")}
-            </span>
-            <span className="text-[10px] text-slate-400 block">Nilai {openPositions.length} saham yang dipegang</span>
+          {/* Segmented Allocation Bar */}
+          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+            <div
+              style={{ width: `${portfolio.bluechipPct || 0}%` }}
+              className="bg-blue-600 transition-all duration-500"
+              title={`Bluechip Solid: ${portfolio.bluechipPct || 0}%`}
+            />
+            <div
+              style={{ width: `${portfolio.scalpingPct || 0}%` }}
+              className="bg-amber-500 transition-all duration-500"
+              title={`High Risk Scalping: ${portfolio.scalpingPct || 0}%`}
+            />
+            <div
+              style={{ width: `${portfolio.idleCashPct || 0}%` }}
+              className="bg-slate-300 transition-all duration-500"
+              title={`Kas Siap Pakai: ${portfolio.idleCashPct || 0}%`}
+            />
+          </div>
+
+          {/* Breakdown 3 Kolom: Bluechip vs Scalping vs Kas */}
+          <div className="grid grid-cols-3 gap-1.5 text-center text-xs pt-0.5">
+            <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-100">
+              <span className="text-[10px] font-bold text-blue-800 block">🛡️ Bluechip (60%)</span>
+              <span className="text-xs font-bold text-blue-950 tabular-nums block mt-0.5">
+                Rp {(portfolio.bluechipInvested || 0).toLocaleString("id-ID")}
+              </span>
+              <span className="text-[9px] text-blue-700 font-semibold">{portfolio.bluechipPct || 0}% Total</span>
+            </div>
+
+            <div className="p-2 rounded-xl bg-amber-50/80 border border-amber-100">
+              <span className="text-[10px] font-bold text-amber-800 block">⚡ Scalping (40%)</span>
+              <span className="text-xs font-bold text-amber-950 tabular-nums block mt-0.5">
+                Rp {(portfolio.scalpingInvested || 0).toLocaleString("id-ID")}
+              </span>
+              <span className="text-[9px] text-amber-700 font-semibold">{portfolio.scalpingPct || 0}% Total</span>
+            </div>
+
+            <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[10px] font-bold text-slate-700 block">💵 Kas Bebas</span>
+              <span className="text-xs font-bold text-slate-900 tabular-nums block mt-0.5">
+                Rp {portfolio.cash.toLocaleString("id-ID")}
+              </span>
+              <span className="text-[9px] text-slate-500 font-semibold">{portfolio.idleCashPct || 0}% Total</span>
+            </div>
           </div>
         </div>
 
         {/* Beginner Guide Expandable */}
         {showGuide && (
-          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-slate-700 space-y-1 animate-in fade-in duration-150">
-            <p className="font-bold text-blue-900">Cara Kerja Dompet Simulasi:</p>
-            <p>• Modal simulasi Rp 5.000.000 dialokasikan secara otomatis oleh AI ke 2 saham potensial saat jam bursa.</p>
-            <p>• Jika saham naik mencapai target (+5%), sistem otomatis menjualnya untuk mengunci keuntungan (Take Profit).</p>
-            <p>• Jika saham turun batas rugi (-3%), sistem otomatis menjualnya agar modal tidak tergerus (Stop Loss).</p>
+          <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 text-[11px] text-slate-700 space-y-2 animate-in fade-in duration-150">
+            <p className="font-bold text-blue-900 text-xs">Mekanisme Portofolio AI 60/40 & Data Real-time:</p>
+            <div className="space-y-1.5 text-[11px] leading-relaxed">
+              <p>
+                <strong>🛡️ 60% Bluechip Solid (Pilar Modal):</strong> Dialokasikan ke emiten berkapitalisasi & volume besar (LQ45 seperti BBCA, BBRI, BMRI, ANTM, dsb). Bertujuan menjaga stabilitas modal dengan swing profit (+5%).
+              </p>
+              <p>
+                <strong>⚡ 40% High Risk High Reward (Scalping Cepat):</strong> Dialokasikan ke saham likuid bervolatilitas harian tinggi dengan momentum RSI positif. Bertujuan akselerasi profit cepat (+3.5%) dan proteksi cut loss disiplin (-2.0%).
+              </p>
+              <p>
+                <strong>🔄 Reinvesting Saldo Kas Otomatis:</strong> Sistem tidak pernah membiarkan kas menganggur saat jam bursa buka. Begitu posisi ditutup (TP/SL) atau terdapat saldo kas, AI langsung membelanjakannya ke saham baru sesuai porsi 60/40.
+              </p>
+              <p>
+                <strong>⏱️ Penanggulangan Tick Cepat Real-time (Surgical Polling):</strong> AI menggunakan TradingView Scanner (tanpa batas kuota) untuk menyaring 800+ saham, lalu hanya menembak <strong>Zapi Stockbit API 0s-delay</strong> untuk 2-4 saham yang sedang dipegang portofolio. Hasilnya: harga matching engine & antrian Bid/Offer 100% live detik ini tanpa menguras kuota API.
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -738,6 +796,15 @@ export function AILabView() {
                     <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
                       {pos.lots} LOT ({pos.shares.toLocaleString("id-ID")} Lembar)
                     </span>
+                    {pos.category === "BLUECHIP_60" ? (
+                      <span className="text-[10px] font-extrabold text-blue-800 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
+                        🛡️ BLUECHIP 60%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                        ⚡ SCALPING 40%
+                      </span>
+                    )}
                     {pos.isRealtimeBEI && (
                       <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                         LIVE BEI 0s
@@ -814,14 +881,14 @@ export function AILabView() {
                   <div className="flex items-center justify-between">
                     <span className="text-emerald-800 font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Target Jual Untung (+5%):
+                      Target Jual Untung (+{pos.category === "SCALPING_40" ? "3.5" : "5"}%):
                     </span>
                     <strong className="text-emerald-700">Rp {pos.targetPrice.toLocaleString("id-ID")}</strong>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-rose-800 font-semibold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                      Batas Pengaman Rugi (-3%):
+                      Batas Pengaman Rugi (-{pos.category === "SCALPING_40" ? "2.0" : "2.5"}%):
                     </span>
                     <strong className="text-rose-700">Rp {pos.stopLossPrice.toLocaleString("id-ID")}</strong>
                   </div>

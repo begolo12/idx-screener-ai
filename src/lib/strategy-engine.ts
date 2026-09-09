@@ -11,11 +11,14 @@ export interface TradingScheme {
   stopLossPct: number;
 }
 
+export type PositionCategory = "BLUECHIP_60" | "SCALPING_40";
+
 export interface PaperTrade {
   id: string;
   ticker: string;
   name: string;
   type: "BUY";
+  category?: PositionCategory;
   lots: number;
   shares: number; // lots * 100 (standar BEI / IDX)
   entryPrice: number;
@@ -55,6 +58,13 @@ export interface PortfolioBalance {
   totalEquity: number;
   totalProfitNominal: number;
   totalProfitPct: number;
+  bluechipInvested: number;
+  scalpingInvested: number;
+  bluechipTargetPct: number; // 60
+  scalpingTargetPct: number; // 40
+  bluechipPct: number;
+  scalpingPct: number;
+  idleCashPct: number;
 }
 
 export interface DurationKPI {
@@ -319,52 +329,206 @@ function generateRealTradeHistoryFromMarket(
   return trades;
 }
 
-// Initialize positions with real TradingView data fitting Rp 5.000.000 budget
-async function initRealPositionsIfEmpty() {
-  if (isInitialized) return;
-  const status = checkIDXMarketStatus();
+export const BLUECHIP_TICKERS = new Set([
+  "BBCA", "BBRI", "BMRI", "BBNI", "TLKM", "ASII", "ICBP", "UNTR",
+  "AMMN", "BRPT", "ADRO", "KLBF", "PGAS", "PTBA", "CPIN", "INDF",
+  "SMGR", "INCO", "ANTM", "ISAT"
+]);
 
-  // Jika jam bursa sedang tutup, pertahankan modal dalam 100% kas tunai riil
-  if (!status.isOpen) {
-    globalState.cash = INITIAL_CAPITAL;
-    globalState.openPositions = [];
-    globalState.aiRationale = `Bursa IDX saat ini ${status.statusText}. Saldo kas Rp ${INITIAL_CAPITAL.toLocaleString("id-ID")} (100% Tunai). AI akan otomatis mengeksekusi pembelian saham rekomendasi teratas saat bursa dibuka pukul 09:00 WIB.`;
-    isInitialized = true;
-    return;
+export function isBluechipStock(s: TechnicalStock): boolean {
+  if (BLUECHIP_TICKERS.has(s.ticker)) return true;
+  return s.turnover >= 8_000_000_000 && s.price >= 500;
+}
+
+export function isScalpingStock(s: TechnicalStock, excludeTickers: Set<string>): boolean {
+  if (excludeTickers.has(s.ticker)) return false;
+  // Wajib likuid agar order mudah dieksekusi di bursa riil
+  if (s.turnover < 1_000_000_000 || s.volume < 300_000) return false;
+  // Volatilitas harian tinggi untuk pergerakan scalping cepat
+  const isVolatile = (s.volatilityDaily && s.volatilityDaily >= 2.8) || (s.perfWeek && Math.abs(s.perfWeek) >= 1.5);
+  if (!isVolatile) return false;
+  // Analisa teknikal menguntungkan: momentum positif & tidak overbought ekstrem
+  const isHealthyMomentum = s.rsi >= 45 && s.rsi <= 78;
+  const isFavorable = s.recommendation >= 0 || (s.macd >= s.macdSignal) || s.changePct >= 0;
+  return Boolean(isHealthyMomentum && isFavorable);
+}
+
+// Reinvest idle cash into 60% Bluechip or 40% Scalping so cash never sits idle
+function rebalanceIdleCash(liveStocks: TechnicalStock[], marketStatus: MarketScheduleStatus) {
+  if (globalState.openPositions.length >= 4) return;
+  if (globalState.cash < 250_000) return;
+
+  const currentInvested = globalState.openPositions.reduce((acc, p) => acc + p.currentValue, 0);
+  const totalEquity = globalState.cash + currentInvested;
+  const targetBluechip = totalEquity * 0.60;
+  const targetScalping = totalEquity * 0.40;
+
+  const currentBluechip = globalState.openPositions
+    .filter(p => p.category === "BLUECHIP_60")
+    .reduce((acc, p) => acc + p.cost, 0);
+
+  const currentScalping = globalState.openPositions
+    .filter(p => p.category === "SCALPING_40")
+    .reduce((acc, p) => acc + p.cost, 0);
+
+  const existingTickers = new Set(globalState.openPositions.map(p => p.ticker));
+  const bluechipDeficit = targetBluechip - currentBluechip;
+  const scalpingDeficit = targetScalping - currentScalping;
+
+  // Prioritas 1: Tambah saham Bluechip jika porsi < 60%
+  if (bluechipDeficit >= 400_000 && globalState.cash >= 300_000) {
+    const candidate = liveStocks.find(s => isBluechipStock(s) && !existingTickers.has(s.ticker));
+    if (candidate) {
+      const pricePerLot = candidate.price * 100;
+      const budget = Math.min(globalState.cash, bluechipDeficit);
+      const lots = Math.floor(budget / pricePerLot);
+      if (lots >= 1) {
+        const cost = lots * pricePerLot;
+        globalState.cash -= cost;
+        const tp = Math.round(candidate.price * (1 + globalState.activeScheme.targetProfitPct / 100));
+        const sl = Math.round(candidate.price * (1 - globalState.activeScheme.stopLossPct / 100));
+        globalState.openPositions.unshift({
+          id: `live-bc-${candidate.ticker}-${Date.now()}`,
+          ticker: candidate.ticker,
+          name: candidate.name,
+          type: "BUY",
+          category: "BLUECHIP_60",
+          lots,
+          shares: lots * 100,
+          entryPrice: candidate.price,
+          currentPrice: candidate.price,
+          cost,
+          currentValue: cost,
+          pnlNominal: 0,
+          pnlPct: 0.0,
+          targetPrice: tp,
+          stopLossPrice: sl,
+          status: "OPEN",
+          schemeName: globalState.activeScheme.name,
+          entryDate: new Date().toLocaleDateString("id-ID"),
+          rationale: `[60% BLUECHIP SOLID] Reinvest kas otomatis saat bursa aktif: ${lots} Lot (@ Rp ${candidate.price.toLocaleString("id-ID")}). Likuiditas besar & stabilitas tinggi.`,
+        });
+        existingTickers.add(candidate.ticker);
+      }
+    }
   }
 
+  // Prioritas 2: Tambah saham Scalping jika porsi < 40%
+  if (scalpingDeficit >= 300_000 && globalState.cash >= 250_000 && globalState.openPositions.length < 4) {
+    const candidate = liveStocks.find(s => isScalpingStock(s, existingTickers));
+    if (candidate) {
+      const pricePerLot = candidate.price * 100;
+      const budget = Math.min(globalState.cash, scalpingDeficit);
+      const lots = Math.floor(budget / pricePerLot);
+      if (lots >= 1) {
+        const cost = lots * pricePerLot;
+        globalState.cash -= cost;
+        const tp = Math.round(candidate.price * 1.035);
+        const sl = Math.round(candidate.price * 0.98);
+        globalState.openPositions.unshift({
+          id: `live-sc-${candidate.ticker}-${Date.now()}`,
+          ticker: candidate.ticker,
+          name: candidate.name,
+          type: "BUY",
+          category: "SCALPING_40",
+          lots,
+          shares: lots * 100,
+          entryPrice: candidate.price,
+          currentPrice: candidate.price,
+          cost,
+          currentValue: cost,
+          pnlNominal: 0,
+          pnlPct: 0.0,
+          targetPrice: tp,
+          stopLossPrice: sl,
+          status: "OPEN",
+          schemeName: "High Risk Scalping Momentum",
+          entryDate: new Date().toLocaleDateString("id-ID"),
+          rationale: `[40% SCALPING KILAT] Reinvest kas otomatis: ${lots} Lot (@ Rp ${candidate.price.toLocaleString("id-ID")}). Volatilitas ${candidate.volatilityDaily || 3.0}%/hari, RSI ${candidate.rsi}. TP +3.5% / SL -2%.`,
+        });
+        existingTickers.add(candidate.ticker);
+      }
+    }
+  }
+}
+
+// Initialize positions with real TradingView data fitting Rp 5.000.000 budget (60% Bluechip + 40% Scalping)
+async function initRealPositionsIfEmpty() {
+  if (isInitialized) return;
+
   try {
-    const liveStocks = await getTechnicalStocks(25);
-    // Cari 2 saham riil teraktif dari TradingView yang memenuhi kriteria
-    const candidates = liveStocks
-      .filter(s => s.price >= 100 && s.price <= 10000 && s.volume > 500000)
-      .slice(0, 2);
+    const liveStocks = await getTechnicalStocks(40);
+    const existingTickers = new Set<string>();
+    const initialPositions: PaperTrade[] = [];
+    let availableCash = INITIAL_CAPITAL;
 
-    if (candidates.length > 0) {
-      const targetAllocation = 2_000_000;
-      let availableCash = INITIAL_CAPITAL;
-      const initialPositions: PaperTrade[] = [];
+    // 1. Alokasi 60% Saham Bluechip (Target ~Rp 3.000.000)
+    const bluechips = liveStocks.filter(s => isBluechipStock(s));
+    if (bluechips.length > 0) {
+      const targetBc = 3_000_000;
+      const chosenBc = bluechips[0];
+      const pricePerLot = chosenBc.price * 100;
+      const lots = Math.max(1, Math.floor(targetBc / pricePerLot));
+      const cost = lots * pricePerLot;
 
-      for (let i = 0; i < candidates.length; i++) {
-        const s = candidates[i];
-        const pricePerLot = s.price * 100;
-        const lots = Math.max(1, Math.floor(targetAllocation / pricePerLot));
+      if (availableCash >= cost) {
+        availableCash -= cost;
+        const tp = Math.round(chosenBc.price * (1 + globalState.activeScheme.targetProfitPct / 100));
+        const sl = Math.round(chosenBc.price * (1 - globalState.activeScheme.stopLossPct / 100));
+
+        initialPositions.push({
+          id: `live-bc-${chosenBc.ticker}`,
+          ticker: chosenBc.ticker,
+          name: chosenBc.name,
+          type: "BUY",
+          category: "BLUECHIP_60",
+          lots,
+          shares: lots * 100,
+          entryPrice: chosenBc.price,
+          currentPrice: chosenBc.price,
+          cost,
+          currentValue: cost,
+          pnlNominal: 0,
+          pnlPct: 0.0,
+          targetPrice: tp,
+          stopLossPrice: sl,
+          status: "OPEN",
+          schemeName: globalState.activeScheme.name,
+          entryDate: new Date().toLocaleDateString("id-ID"),
+          rationale: `[60% BLUECHIP SOLID] Likuiditas raksasa (Turnover Rp ${(chosenBc.turnover / 1e9).toFixed(1)} Miliar), fundamental kuat: ${lots} Lot (@ Rp ${chosenBc.price.toLocaleString("id-ID")}).`,
+        });
+        existingTickers.add(chosenBc.ticker);
+      }
+    }
+
+    // 2. Alokasi 40% Saham High Risk Scalping (Target ~Rp 2.000.000)
+    const scalps = liveStocks.filter(s => isScalpingStock(s, existingTickers));
+    if (scalps.length > 0) {
+      const targetPerScalp = scalps.length >= 2 ? 1_000_000 : 2_000_000;
+      const countToTake = Math.min(2, scalps.length);
+
+      for (let i = 0; i < countToTake; i++) {
+        const sc = scalps[i];
+        const pricePerLot = sc.price * 100;
+        const lots = Math.max(1, Math.floor(Math.min(availableCash, targetPerScalp) / pricePerLot));
         const cost = lots * pricePerLot;
 
-        if (availableCash >= cost) {
+        if (availableCash >= cost && lots >= 1) {
           availableCash -= cost;
-          const tp = Math.round(s.price * (1 + globalState.activeScheme.targetProfitPct / 100));
-          const sl = Math.round(s.price * (1 - globalState.activeScheme.stopLossPct / 100));
+          // Target scalping: TP kilat +3.5%, SL disiplin ketat -2.0%
+          const tp = Math.round(sc.price * 1.035);
+          const sl = Math.round(sc.price * 0.98);
 
           initialPositions.push({
-            id: `live-pos-${s.ticker}-${i}`,
-            ticker: s.ticker,
-            name: s.name,
+            id: `live-sc-${sc.ticker}-${i}`,
+            ticker: sc.ticker,
+            name: sc.name,
             type: "BUY",
+            category: "SCALPING_40",
             lots,
             shares: lots * 100,
-            entryPrice: s.price,
-            currentPrice: s.price,
+            entryPrice: sc.price,
+            currentPrice: sc.price,
             cost,
             currentValue: cost,
             pnlNominal: 0,
@@ -372,20 +536,21 @@ async function initRealPositionsIfEmpty() {
             targetPrice: tp,
             stopLossPrice: sl,
             status: "OPEN",
-            schemeName: globalState.activeScheme.name,
+            schemeName: "High Risk Scalping Momentum",
             entryDate: new Date().toLocaleDateString("id-ID"),
-            rationale: `Beli real TradingView saat bursa aktif: ${lots} Lot (${lots * 100} lembar) @ Rp ${s.price.toLocaleString("id-ID")}. RSI ${s.rsi}.`,
+            rationale: `[40% SCALPING KILAT] Momentum cepat: ${lots} Lot (@ Rp ${sc.price.toLocaleString("id-ID")}). Volatilitas ${sc.volatilityDaily || 3.0}%/hari, RSI ${sc.rsi}. TP +3.5% / SL -2%.`,
           });
+          existingTickers.add(sc.ticker);
         }
       }
-
-      globalState.openPositions = initialPositions;
-      globalState.cash = availableCash;
-      globalState.aiRationale = `Alokasi modal Rp 5.000.000 saat bursa buka: ${initialPositions.map(p => `${p.ticker} (${p.lots} Lot)`).join(", ")}. Sisa kas Rp ${availableCash.toLocaleString("id-ID")}.`;
     }
+
+    globalState.openPositions = initialPositions;
+    globalState.cash = availableCash;
+    globalState.aiRationale = `Alokasi portofolio teroptimasi: 60% Bluechip Solid & 40% High Risk Scalping. Posisi aktif: ${initialPositions.map(p => `${p.ticker} (${p.category === "BLUECHIP_60" ? "60% Bluechip" : "40% Scalp"})`).join(", ")}. Sisa kas Rp ${availableCash.toLocaleString("id-ID")}.`;
     isInitialized = true;
   } catch (err) {
-    console.error("Failed to init real positions:", err);
+    console.error("Failed to init real 60/40 positions:", err);
   }
 }
 
@@ -428,28 +593,34 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
 
       // Prioritize 0-delay live matching engine price from Stockbit
       const currentPrice = (sb && sb.last > 0) ? sb.last : (live?.price || pos.currentPrice);
-      const currentValue = pos.shares * currentPrice;
-      const pnlNominal = currentValue - pos.cost;
-      const pnlPct = Number((((currentPrice - pos.entryPrice) / pos.entryPrice) * 100).toFixed(2));
-      const isRealtimeBEI = Boolean(sb && sb.last > 0);
       const bestBid = sb?.bestBid || pos.bestBid;
       const bestOffer = sb?.bestOffer || pos.bestOffer;
       const tradingTime = sb?.tradingTime || pos.tradingTime;
+      const isRealtimeBEI = Boolean(sb && sb.last > 0);
 
-      // Check Take Profit or Stop Loss only when market was open
+      // In real BEI matching engine, selling executes at Best Bid price
+      const executionPrice = (bestBid && bestBid.price > 0) ? bestBid.price : currentPrice;
+      const currentValue = pos.shares * currentPrice;
+      const pnlNominal = currentValue - pos.cost;
+      const pnlPct = Number((((currentPrice - pos.entryPrice) / pos.entryPrice) * 100).toFixed(2));
+
+      // Check Take Profit or Stop Loss only when market is open
       if (marketStatus.isOpen) {
-        if (currentPrice >= pos.targetPrice) {
-          globalState.cash += currentValue;
+        if (executionPrice >= pos.targetPrice || currentPrice >= pos.targetPrice) {
+          const exitVal = pos.shares * executionPrice;
+          globalState.cash += exitVal;
+          const exitPnlNominal = exitVal - pos.cost;
+          const exitPnlPct = Number((((executionPrice - pos.entryPrice) / pos.entryPrice) * 100).toFixed(2));
           newlyClosed.push({
             ...pos,
-            currentPrice,
-            exitPrice: currentPrice,
-            currentValue,
-            pnlNominal,
-            pnlPct,
+            currentPrice: executionPrice,
+            exitPrice: executionPrice,
+            currentValue: exitVal,
+            pnlNominal: exitPnlNominal,
+            pnlPct: exitPnlPct,
             status: "CLOSED_TP",
             exitDate: new Date().toLocaleDateString("id-ID"),
-            rationale: `Target Profit +${pnlPct}% (Rp +${pnlNominal.toLocaleString("id-ID")}) tercapai di harga live Rp ${currentPrice}.`,
+            rationale: `Target Profit +${exitPnlPct}% (Rp +${exitPnlNominal.toLocaleString("id-ID")}) tereksekusi di Best Bid bursa riil Rp ${executionPrice}.`,
             bestBid,
             bestOffer,
             isRealtimeBEI,
@@ -458,18 +629,21 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
           return null as any;
         }
 
-        if (currentPrice <= pos.stopLossPrice) {
-          globalState.cash += currentValue;
+        if (executionPrice <= pos.stopLossPrice || currentPrice <= pos.stopLossPrice) {
+          const exitVal = pos.shares * executionPrice;
+          globalState.cash += exitVal;
+          const exitPnlNominal = exitVal - pos.cost;
+          const exitPnlPct = Number((((executionPrice - pos.entryPrice) / pos.entryPrice) * 100).toFixed(2));
           newlyClosed.push({
             ...pos,
-            currentPrice,
-            exitPrice: currentPrice,
-            currentValue,
-            pnlNominal,
-            pnlPct,
+            currentPrice: executionPrice,
+            exitPrice: executionPrice,
+            currentValue: exitVal,
+            pnlNominal: exitPnlNominal,
+            pnlPct: exitPnlPct,
             status: "CLOSED_SL",
             exitDate: new Date().toLocaleDateString("id-ID"),
-            rationale: `Stop Loss ${pnlPct}% (Rp ${pnlNominal.toLocaleString("id-ID")}) terpicu di harga live Rp ${currentPrice}.`,
+            rationale: `Stop Loss ${exitPnlPct}% (Rp ${exitPnlNominal.toLocaleString("id-ID")}) terpicu di Best Bid bursa riil Rp ${executionPrice}.`,
             bestBid,
             bestOffer,
             isRealtimeBEI,
@@ -501,15 +675,32 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
       globalState.tradeHistory = generateRealTradeHistoryFromMarket(liveStocks, globalState.activeScheme);
     }
     globalState.openPositions = updatedOpenPositions;
+
+    // Immediately reinvest freed cash so saldo kas never sits idle!
+    if (marketStatus.isOpen && globalState.cash >= 250_000) {
+      rebalanceIdleCash(liveStocks, marketStatus);
+    }
   } catch (err) {
     console.error("Failed to sync live prices for Strategy Lab:", err);
   }
 
-  // Calculate portfolio balance
-  const invested = globalState.openPositions.reduce((acc, p) => acc + p.currentValue, 0);
+  // Calculate portfolio balance with 60/40 allocation metrics
+  const bluechipInvested = globalState.openPositions
+    .filter(p => p.category === "BLUECHIP_60")
+    .reduce((acc, p) => acc + p.currentValue, 0);
+
+  const scalpingInvested = globalState.openPositions
+    .filter(p => p.category === "SCALPING_40")
+    .reduce((acc, p) => acc + p.currentValue, 0);
+
+  const invested = bluechipInvested + scalpingInvested;
   const totalEquity = globalState.cash + invested;
   const totalProfitNominal = totalEquity - INITIAL_CAPITAL;
   const totalProfitPct = Number((((totalEquity - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100).toFixed(2));
+
+  const bluechipPct = totalEquity > 0 ? Number(((bluechipInvested / totalEquity) * 100).toFixed(1)) : 0;
+  const scalpingPct = totalEquity > 0 ? Number(((scalpingInvested / totalEquity) * 100).toFixed(1)) : 0;
+  const idleCashPct = totalEquity > 0 ? Number(((globalState.cash / totalEquity) * 100).toFixed(1)) : 0;
 
   // Metrics from closed trades (strictly based on real closed trades)
   const closed = globalState.tradeHistory;
@@ -640,6 +831,13 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
         totalEquity,
         totalProfitNominal,
         totalProfitPct,
+        bluechipInvested,
+        scalpingInvested,
+        bluechipTargetPct: 60,
+        scalpingTargetPct: 40,
+        bluechipPct,
+        scalpingPct,
+        idleCashPct,
       },
       activeScheme: globalState.activeScheme,
       availableSchemes: SCHEMES,
@@ -754,6 +952,7 @@ export async function runAIStrategyOptimization(): Promise<{
             pnlPct: 0,
             targetPrice: tp,
             stopLossPrice: sl,
+            category: isBluechipStock(chosen) ? "BLUECHIP_60" : "SCALPING_40",
             status: "OPEN",
             schemeName: matched.name,
             entryDate: new Date().toLocaleDateString("id-ID"),

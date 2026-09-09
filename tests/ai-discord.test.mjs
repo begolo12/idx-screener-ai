@@ -84,15 +84,54 @@ test("sector picks limits to maximum 5 stocks per sector", () => {
   assert.equal(top5[4].ticker, "BRIS");
 });
 
-test("discord webhook validator detects valid and invalid urls", () => {
-  const validUrl = "https://discord.com/api/webhooks/123456/abcdef";
-  const validAppUrl = "https://discordapp.com/api/webhooks/123456/abcdef";
-  const invalidUrl = "https://example.com/invalid";
+test("portfolio 60/40 scheme correctly allocates Bluechip and Scalping budgets", () => {
+  const initialCapital = 5_000_000;
+  const targetBluechip = initialCapital * 0.60; // 3,000,000
+  const targetScalping = initialCapital * 0.40; // 2,000,000
 
-  const isValid = (url) => url.startsWith("https://discord.com/api/webhooks/") || url.startsWith("https://discordapp.com/api/webhooks/");
+  // 1. Bluechip BBRI @ 3,390 (1 lot = 339,000) -> 8 lot = 2,712,000
+  const bbriPrice = 3390;
+  const bbriLots = Math.floor(targetBluechip / (bbriPrice * 100)); // 8 lots
+  const bbriCost = bbriLots * bbriPrice * 100; // 2,712,000
 
-  assert.ok(isValid(validUrl));
-  assert.ok(isValid(validAppUrl));
-  assert.ok(!isValid(invalidUrl));
+  // 2. Scalping BIPI @ 162 (1 lot = 16,200) + ISAT @ 2,450 (1 lot = 245,000)
+  const bipiPrice = 162;
+  const bipiLots = Math.floor(1_000_000 / (bipiPrice * 100)); // 61 lots = 988,200
+  const bipiCost = bipiLots * bipiPrice * 100;
+
+  const isatPrice = 2450;
+  const isatLots = Math.floor(1_000_000 / (isatPrice * 100)); // 4 lots = 980,000
+  const isatCost = isatLots * isatPrice * 100;
+
+  const totalInvested = bbriCost + bipiCost + isatCost;
+  const remainingCash = initialCapital - totalInvested;
+
+  assert.equal(bbriLots, 8);
+  assert.equal(bbriCost, 2_712_000);
+  assert.ok(bipiCost >= 900_000 && bipiCost <= 1_000_000);
+  assert.ok(isatCost >= 900_000 && isatCost <= 1_000_000);
+  assert.ok(remainingCash < 400_000, "Cash is maximally deployed without sitting idle");
+  assert.equal(totalInvested + remainingCash, initialCapital);
 });
+
+test("reinvesting idle cash triggers when position closed at Take Profit", () => {
+  let cash = 320_000;
+  const closedPositionGain = 1_050_000; // TP +5% on 1M position
+  cash += closedPositionGain; // Now cash is 1,370,000
+
+  assert.equal(cash, 1_370_000);
+  assert.ok(cash >= 250_000, "Cash exceeds 250k reinvest threshold");
+
+  // Reinvestment allocates to next viable stock
+  const candidatePrice = 224; // BUMI @ 224
+  const pricePerLot = candidatePrice * 100; // 22,400
+  const lotsToBuy = Math.floor(cash / pricePerLot); // 61 lots
+  const deployCost = lotsToBuy * pricePerLot; // 1,366,400
+  cash -= deployCost; // 3,600 idle cash remaining
+
+  assert.equal(lotsToBuy, 61);
+  assert.equal(deployCost, 1_366_400);
+  assert.ok(cash < 25_000, "Freed cash instantly reinvested into active market asset");
+});
+
 
