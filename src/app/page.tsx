@@ -63,7 +63,7 @@ export default function HomePage() {
     if (!isSilent) setLoading(true);
     else setIsLiveSyncing(true);
 
-    const query = new URLSearchParams({ sort, limit: "100" });
+    const query = new URLSearchParams({ sort, limit: "800" });
     if (sector !== "Semua") query.set("sector", sector);
     if (minPrice) query.set("minPrice", minPrice);
     if (maxPrice) query.set("maxPrice", maxPrice);
@@ -143,16 +143,29 @@ export default function HomePage() {
 
   const hasCustomFilter = sector !== "Semua" || Boolean(minPrice) || Boolean(maxPrice);
 
-  // Client-side search filtering
+  // Client-side search filtering across all 800+ stocks
   const filteredStocks = useMemo(() => {
     if (!searchQuery.trim()) return stocks;
     const q = searchQuery.toLowerCase().trim();
-    return stocks.filter(
+    const matches = stocks.filter(
       (s) =>
         s.ticker.toLowerCase().includes(q) ||
         (s.name && s.name.toLowerCase().includes(q)) ||
         (s.sector && s.sector.toLowerCase().includes(q))
     );
+
+    // Prioritize exact ticker match (e.g. BBCA) or startsWith ticker match
+    return matches.sort((a, b) => {
+      const aExact = a.ticker.toLowerCase() === q;
+      const bExact = b.ticker.toLowerCase() === q;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      const aStarts = a.ticker.toLowerCase().startsWith(q);
+      const bStarts = b.ticker.toLowerCase().startsWith(q);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      return 0;
+    });
   }, [stocks, searchQuery]);
 
   return (
