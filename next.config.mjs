@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  experimental: {
+    cpus: 1,
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" }

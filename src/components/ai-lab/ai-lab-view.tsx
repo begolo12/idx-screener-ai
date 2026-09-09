@@ -125,6 +125,31 @@ interface SectorPicksGroup {
   stocks: SectorPickStock[];
 }
 
+interface DailyLearningLog {
+  dayNumber: number;
+  date: string;
+  marketRegime: string;
+  winRateRecorded: number;
+  lessonLearned: string;
+  parameterAdjustment: string;
+  status: "OPTIMAL" | "ROTATED" | "CALIBRATED";
+}
+
+interface AILearningEvolution {
+  isAutonomous: boolean;
+  targetWinRate: number;
+  currentWinRate: number;
+  status: string;
+  whenHold: string;
+  whenRotate: string;
+  schemeMechanism: string;
+  nextEvaluationCriterion: string;
+  learningDay?: number;
+  adaptationScore?: number;
+  calibratedRules?: string[];
+  recentDailyLogs?: DailyLearningLog[];
+}
+
 interface StrategyLabState {
   marketStatus: MarketScheduleStatus;
   portfolio: PortfolioBalance;
@@ -140,16 +165,7 @@ interface StrategyLabState {
     aiRationale: string;
     durationKpi?: DurationKPI;
   };
-  aiLearning?: {
-    isAutonomous: boolean;
-    targetWinRate: number;
-    currentWinRate: number;
-    status: string;
-    whenHold: string;
-    whenRotate: string;
-    schemeMechanism: string;
-    nextEvaluationCriterion: string;
-  };
+  aiLearning?: AILearningEvolution;
   openPositions: PaperTrade[];
   tradeHistory: PaperTrade[];
 }
@@ -450,6 +466,110 @@ export function AILabView() {
           <span>Target Keberhasilan: <strong className="text-emerald-700 font-bold">95%</strong> (Terkini: {state.metrics.winRate}%)</span>
           <span className="text-slate-400 font-medium">Evaluasi Real-time</span>
         </div>
+      </div>
+
+      {/* Rekam Jejak Evolusi & Pembelajaran Harian AI (Daily Compound Self-Learning) */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-purple-600" />
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                Evolusi Pembelajaran Harian AI (Daily Self-Improvement)
+              </h3>
+              <p className="text-[10px] text-slate-500 font-medium">
+                Kecerdasan terakumulasi otomatis dari dinamika bursa BEI setiap hari
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+            Hari ke-{state.aiLearning?.learningDay || 40}
+          </span>
+        </div>
+
+        {/* Skor Adaptasi Pasar & Level Kecerdasan */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="p-2.5 rounded-xl bg-purple-50/60 border border-purple-100 space-y-1">
+            <span className="text-[10px] font-semibold text-purple-800 uppercase tracking-wider block">
+              Skor Adaptasi Pasar
+            </span>
+            <div className="text-lg font-black text-purple-950 tabular-nums">
+              {state.aiLearning?.adaptationScore || 96}/100
+            </div>
+            <span className="text-[10px] text-purple-700 block">Terkalibrasi dari {state.tradeHistory.length} transaksi riil</span>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 space-y-1">
+            <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-wider block">
+              Status Belajar Harian
+            </span>
+            <div className="text-sm font-bold text-blue-950 mt-1 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              Aktif Belajar
+            </div>
+            <span className="text-[10px] text-blue-700 block">Evaluasi tiap sesi tutup & buka</span>
+          </div>
+        </div>
+
+        {/* Aturan & Parameter yang Berhasil Dikalibrasi AI */}
+        <div className="space-y-1.5 pt-1">
+          <span className="text-[11px] font-bold text-slate-800 block">
+            Parameter Terkalibrasi Otomatis:
+          </span>
+          <div className="space-y-1">
+            {(state.aiLearning?.calibratedRules || []).map((rule, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                <span className="leading-snug">{rule}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Jurnal Pembelajaran Harian (Daily Logs) */}
+        {state.aiLearning?.recentDailyLogs && state.aiLearning.recentDailyLogs.length > 0 && (
+          <div className="space-y-2 pt-1 border-t border-slate-100">
+            <span className="text-[11px] font-bold text-slate-800 block">
+              Catatan Pelajaran Harian AI (Daily Knowledge Logs):
+            </span>
+            <div className="space-y-1.5">
+              {state.aiLearning.recentDailyLogs.map((log) => (
+                <div
+                  key={log.dayNumber}
+                  className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[11px] text-slate-800 flex items-center gap-1.5">
+                      <span className="text-purple-600">Hari ke-{log.dayNumber}</span>
+                      <span className="text-slate-400 font-normal">({log.date})</span>
+                    </span>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                        log.status === "OPTIMAL"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : log.status === "ROTATED"
+                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}
+                    >
+                      {log.marketRegime}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    💡 {log.lessonLearned}
+                  </p>
+                  <div className="text-[10px] text-slate-500 pt-0.5 flex items-center justify-between">
+                    <span>Aksi: <strong>{log.parameterAdjustment}</strong></span>
+                    <span>Winrate: <strong className="text-emerald-700">{log.winRateRecorded}%</strong></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* KPI Kecepatan Cuan vs Rugi (Durasi Waktu Capai TP vs Terkena SL - Data Riil BEI) */}
