@@ -64,6 +64,10 @@ interface PaperTrade {
   exitDate?: string;
   holdingDays?: number;
   rationale: string;
+  bestBid?: { price: number; volume: number };
+  bestOffer?: { price: number; volume: number };
+  isRealtimeBEI?: boolean;
+  tradingTime?: string;
 }
 
 interface MarketScheduleStatus {
@@ -169,7 +173,11 @@ export function AILabView() {
 
   useEffect(() => {
     loadState();
-    const interval = setInterval(loadState, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadState();
+      }
+    }, 8000);
     return () => clearInterval(interval);
   }, []);
 
@@ -725,11 +733,16 @@ export function AILabView() {
               >
                 {/* Header Saham & Untung/Rugi Berjalan */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-base text-slate-900">{pos.ticker}</span>
                     <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
                       {pos.lots} LOT ({pos.shares.toLocaleString("id-ID")} Lembar)
                     </span>
+                    {pos.isRealtimeBEI && (
+                      <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        LIVE BEI 0s
+                      </span>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -768,13 +781,33 @@ export function AILabView() {
                   </div>
 
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-slate-400 text-[10px] block font-medium">Nilai Saat Ini:</span>
+                    <span className="text-slate-400 text-[10px] block font-medium">Nilai Saat Ini (Live):</span>
                     <span className="text-slate-800 font-bold block mt-0.5">
                       Rp {pos.currentValue.toLocaleString("id-ID")}
                     </span>
                     <span className="text-[10px] text-slate-500">(@ Rp {pos.currentPrice.toLocaleString("id-ID")} / lembar)</span>
                   </div>
                 </div>
+
+                {/* Antrian Orderbook Live BEI */}
+                {pos.bestBid && pos.bestOffer && (
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-slate-500 uppercase tracking-wider">Antrian Pasar Terkini</span>
+                      <span className="font-semibold text-slate-400">{pos.tradingTime || "Realtime"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-emerald-50/70 border border-emerald-200/70 rounded-lg p-1.5 flex items-center justify-between">
+                        <span className="text-[10px] text-emerald-800 font-bold">BID: Rp {pos.bestBid.price?.toLocaleString("id-ID")}</span>
+                        <span className="text-[10px] text-emerald-600 font-medium">({Math.round(pos.bestBid.volume / 100).toLocaleString("id-ID")} Lot)</span>
+                      </div>
+                      <div className="bg-rose-50/70 border border-rose-200/70 rounded-lg p-1.5 flex items-center justify-between">
+                        <span className="text-[10px] text-rose-800 font-bold">OFFER: Rp {pos.bestOffer.price?.toLocaleString("id-ID")}</span>
+                        <span className="text-[10px] text-rose-600 font-medium">({Math.round(pos.bestOffer.volume / 100).toLocaleString("id-ID")} Lot)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Target Otomatis Take Profit & Stop Loss */}
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
