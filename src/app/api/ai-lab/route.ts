@@ -3,6 +3,7 @@ import { getStrategyLabState, runAIStrategyOptimization } from "@/lib/strategy-e
 import { getSectorTopPicks } from "@/lib/technical-analysis";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -11,11 +12,16 @@ export async function GET() {
       getSectorTopPicks(),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      state,
-      sectorPicks,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        state,
+        sectorPicks,
+      },
+      {
+        headers: { "Cache-Control": "no-store, must-revalidate" },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || "Failed to load AI strategy lab state" },

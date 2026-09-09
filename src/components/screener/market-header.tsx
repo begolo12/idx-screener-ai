@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Activity, WifiOff, Info, X } from "lucide-react";
+import { Activity, WifiOff, Info, X, RefreshCw } from "lucide-react";
 
 interface HeaderProps {
   overview: {
@@ -12,9 +12,11 @@ interface HeaderProps {
     updatedAt?: string;
     isFallback?: boolean;
   } | null;
+  isSyncing?: boolean;
+  onRefresh?: () => void;
 }
 
-export function MarketHeader({ overview }: HeaderProps) {
+export function MarketHeader({ overview, isSyncing, onRefresh }: HeaderProps) {
   const [showInfo, setShowInfo] = useState(false);
   const ihsg = overview?.ihsg || { value: "6.686,44", change: "+46.93", changePct: "+1.01%" };
   const isUp = !ihsg.changePct.startsWith("-");
@@ -94,9 +96,15 @@ export function MarketHeader({ overview }: HeaderProps) {
             <strong className="text-slate-700 font-bold">{breadth.unchanged}</strong> Stagnan
           </span>
         </div>
-        <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-          BEI Realtime
-        </span>
+        <button
+          onClick={onRefresh}
+          disabled={isSyncing}
+          className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 active:scale-95 px-2 py-0.5 rounded-md border border-blue-200 transition cursor-pointer"
+          title="Klik untuk menyegarkan data seketika"
+        >
+          <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? "animate-spin text-blue-600" : "text-blue-500"}`} />
+          <span>{isSyncing ? "Menyinkronkan..." : "BEI Live • 6s"}</span>
+        </button>
       </div>
 
       {/* Helpful Explanation Tooltip for Beginners */}

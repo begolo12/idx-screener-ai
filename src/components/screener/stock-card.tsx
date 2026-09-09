@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sparkline } from "@/components/ui/sparkline";
 import { Star } from "lucide-react";
 
@@ -24,6 +24,22 @@ interface StockCardProps {
 }
 
 export function StockCard({ stock, isWatchlisted, onToggleWatchlist, onClick }: StockCardProps) {
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+  const prevPriceRef = useRef<number>(stock.price);
+
+  useEffect(() => {
+    if (prevPriceRef.current !== stock.price) {
+      if (stock.price > prevPriceRef.current) {
+        setFlash("up");
+      } else if (stock.price < prevPriceRef.current) {
+        setFlash("down");
+      }
+      prevPriceRef.current = stock.price;
+      const timer = setTimeout(() => setFlash(null), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [stock.price]);
+
   const isUp = stock.changePct > 0;
   const isDown = stock.changePct < 0;
 
@@ -60,7 +76,13 @@ export function StockCard({ stock, isWatchlisted, onToggleWatchlist, onClick }: 
   return (
     <div
       onClick={() => onClick(stock.ticker)}
-      className="p-3.5 bg-white rounded-2xl border border-slate-200/90 hover:border-blue-400 hover:shadow-xs transition duration-150 active:scale-[0.99] cursor-pointer space-y-2.5"
+      className={`p-3.5 bg-white rounded-2xl border transition-all duration-200 active:scale-[0.99] cursor-pointer space-y-2.5 ${
+        flash === "up"
+          ? "border-emerald-400 ring-2 ring-emerald-300/40 shadow-sm bg-emerald-50/20"
+          : flash === "down"
+          ? "border-rose-400 ring-2 ring-rose-300/40 shadow-sm bg-rose-50/20"
+          : "border-slate-200/90 hover:border-blue-400 hover:shadow-xs"
+      }`}
     >
       {/* Top Row: Avatar, Ticker, Name & Price */}
       <div className="flex items-start justify-between gap-2">
@@ -84,7 +106,15 @@ export function StockCard({ stock, isWatchlisted, onToggleWatchlist, onClick }: 
         {/* Price & Watchlist Star */}
         <div className="flex items-center gap-1.5 shrink-0 text-right">
           <div>
-            <div className="font-bold text-sm sm:text-base tabular-nums text-slate-900">
+            <div
+              className={`font-bold text-sm sm:text-base tabular-nums transition-all duration-300 rounded px-1.5 py-0.5 -mx-1.5 inline-block ${
+                flash === "up"
+                  ? "bg-emerald-500 text-white shadow-xs scale-105"
+                  : flash === "down"
+                  ? "bg-rose-500 text-white shadow-xs scale-105"
+                  : "text-slate-900"
+              }`}
+            >
               Rp {stock.price.toLocaleString("id-ID")}
             </div>
             <div className="flex items-center justify-end gap-1.5 mt-0.5">

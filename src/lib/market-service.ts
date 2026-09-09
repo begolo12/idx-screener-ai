@@ -117,7 +117,7 @@ export async function getMarketOverview(): Promise<MarketOverviewData> {
       updatedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setCached(cacheKey, payload, 60);
+    setCached(cacheKey, payload, 8);
     return payload;
   } catch (err) {
     return {
@@ -197,7 +197,7 @@ export async function getAllStocks() {
       };
     });
 
-    setCached(cacheKey, normalized, 45);
+    setCached(cacheKey, normalized, 8);
     return normalized;
   } catch (err) {
     console.error("TradingView Scan failed, falling back to Zapi:", err);

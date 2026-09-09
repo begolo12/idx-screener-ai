@@ -29,6 +29,7 @@ export default function HomePage() {
   const [stocks, setStocks] = useState<any[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isLiveSyncing, setIsLiveSyncing] = useState(false);
 
   // Load Watchlist with local + remote sync
   useEffect(() => {
@@ -50,31 +51,71 @@ export default function HomePage() {
   }, []);
 
   // Load Market Overview
-  useEffect(() => {
-    fetch("/api/market/overview")
+  const loadOverview = () => {
+    return fetch("/api/market/overview", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => setOverview(data))
       .catch(() => {});
-  }, []);
+  };
 
   // Load Screener Stocks
-  const loadStocks = () => {
-    setLoading(true);
+  const loadStocks = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    else setIsLiveSyncing(true);
+
     const query = new URLSearchParams({ sort, limit: "100" });
     if (sector !== "Semua") query.set("sector", sector);
     if (minPrice) query.set("minPrice", minPrice);
     if (maxPrice) query.set("maxPrice", maxPrice);
 
-    fetch(`/api/screener?${query.toString()}`)
+    return fetch(`/api/screener?${query.toString()}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((res) => setStocks(res.data || []))
-      .catch(() => setStocks([]))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (res.data && Array.isArray(res.data)) {
+          setStocks(res.data);
+        }
+      })
+      .catch(() => {
+        if (!isSilent) setStocks([]);
+      })
+      .finally(() => {
+        if (!isSilent) setLoading(false);
+        setIsLiveSyncing(false);
+      });
+  };
+
+  const handleManualRefresh = () => {
+    setIsLiveSyncing(true);
+    Promise.all([loadOverview(), loadStocks(true)]).finally(() => {
+      setIsLiveSyncing(false);
+    });
   };
 
   useEffect(() => {
-    loadStocks();
-  }, [sort, sector]);
+    loadOverview();
+    loadStocks(false);
+
+    // Auto-refresh interval (polling every 6 seconds when window tab is active)
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadOverview();
+        loadStocks(true);
+      }
+    }, 6000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadOverview();
+        loadStocks(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [sort, sector, minPrice, maxPrice]);
 
   const toggleWatchlist = (ticker: string) => {
     const isPresent = watchlist.includes(ticker);
@@ -116,7 +157,11 @@ export default function HomePage() {
 
   return (
     <div className="flex-1 flex flex-col w-full">
-      <MarketHeader overview={overview} />
+      <MarketHeader
+        overview={overview}
+        isSyncing={isLiveSyncing}
+        onRefresh={handleManualRefresh}
+      />
 
       {tab === "screener" && (
         <div className="flex-1 flex flex-col pb-28">

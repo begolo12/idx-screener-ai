@@ -32,12 +32,29 @@ export function StockModal({
 
   useEffect(() => {
     if (!ticker) return;
-    setLoading(true);
-    fetch(`/api/stocks/${ticker}`)
-      .then((r) => r.json())
-      .then((res) => setData(res))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+
+    const fetchStock = (isSilent = false) => {
+      if (!isSilent) setLoading(true);
+      fetch(`/api/stocks/${ticker}`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((res) => setData(res))
+        .catch(() => {
+          if (!isSilent) setData(null);
+        })
+        .finally(() => {
+          if (!isSilent) setLoading(false);
+        });
+    };
+
+    fetchStock(false);
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchStock(true);
+      }
+    }, 6000);
+
+    return () => clearInterval(interval);
   }, [ticker]);
 
   useEffect(() => {

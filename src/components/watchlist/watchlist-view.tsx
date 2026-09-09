@@ -27,16 +27,33 @@ export function WatchlistView({
       setStocks([]);
       return;
     }
-    setLoading(true);
-    fetch("/api/screener?limit=100")
-      .then((r) => r.json())
-      .then((res) => {
-        const all = res.data || [];
-        const filtered = all.filter((s: any) => watchlist.includes(s.ticker));
-        setStocks(filtered);
-      })
-      .catch(() => setStocks([]))
-      .finally(() => setLoading(false));
+
+    const fetchWatchlist = (isSilent = false) => {
+      if (!isSilent) setLoading(true);
+      fetch("/api/screener?limit=100", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((res) => {
+          const all = res.data || [];
+          const filtered = all.filter((s: any) => watchlist.includes(s.ticker));
+          setStocks(filtered);
+        })
+        .catch(() => {
+          if (!isSilent) setStocks([]);
+        })
+        .finally(() => {
+          if (!isSilent) setLoading(false);
+        });
+    };
+
+    fetchWatchlist(false);
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchWatchlist(true);
+      }
+    }, 6000);
+
+    return () => clearInterval(interval);
   }, [watchlist]);
 
   if (watchlist.length === 0) {
