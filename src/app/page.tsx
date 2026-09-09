@@ -95,13 +95,13 @@ export default function HomePage() {
     loadOverview();
     loadStocks(false);
 
-    // Auto-refresh interval (polling every 6 seconds when window tab is active)
+    // Auto-refresh interval (polling every 20 seconds when window tab is active)
     const intervalId = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         loadOverview();
         loadStocks(true);
       }
-    }, 6000);
+    }, 20000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {

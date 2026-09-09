@@ -71,8 +71,8 @@ export async function getMarketOverview(): Promise<MarketOverviewData> {
   const minute = wibTime.getMinutes();
   const isWeekday = day >= 1 && day <= 5;
   const isMarketHours = isWeekday && (hour > 9 || (hour === 9 && minute >= 0)) && (hour < 15 || (hour === 15 && minute <= 30));
-  // Smart TTL: 15s during active market, 300s (5 mins) when closed to preserve 100% Zapi quota
-  const cacheTtl = isMarketHours ? 15 : 300;
+  // Smart TTL: 30s during active market, 600s (10 mins) when closed to preserve 100% Zapi quota
+  const cacheTtl = isMarketHours ? 30 : 600;
 
   let ihsgValue = "6.663,19";
   let changeVal = "-23.25";
@@ -80,9 +80,16 @@ export async function getMarketOverview(): Promise<MarketOverviewData> {
   let marketStatus = "LIVE BEI (0s)";
   let gotRealtime = false;
 
-  // 1. Prioritize Stockbit via Zapi for 0-delay real-time IHSG
+  // 1. Stockbit via Zapi with 60s dedicated cache to protect quota
   try {
-    const sb: any = await zpi.run("finance:stockbit", "quote", { symbol: "IHSG" });
+    const ihsgCacheKey = "stockbit_ihsg_quote";
+    let sb: any = getCached<any>(ihsgCacheKey);
+    if (!sb) {
+      sb = await zpi.run("finance:stockbit", "quote", { symbol: "IHSG" });
+      if (sb && typeof sb.last === "number") {
+        setCached(ihsgCacheKey, sb, 60);
+      }
+    }
     if (sb && typeof sb.last === "number") {
       ihsgValue = Number(sb.last).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       changeVal = `${sb.change >= 0 ? "+" : ""}${Number(sb.change).toFixed(2)}`;
@@ -117,7 +124,7 @@ export async function getMarketOverview(): Promise<MarketOverviewData> {
     } catch {}
   }
 
-  // 3. Foreign flow (cached 60s)
+  // 3. Foreign flow (cached 900s / 15 mins - slow-moving data)
   let netForeign = "+Rp 142.5 M (Net Buy)";
   try {
     const foreignCacheKey = "foreign_flow_kontan";
@@ -128,7 +135,7 @@ export async function getMarketOverview(): Promise<MarketOverviewData> {
       const foreign: any = await zpi.run("finance:kontan", "dana-asing-saham", {});
       if (foreign?.data?.[0]?.net) {
         netForeign = foreign.data[0].net;
-        setCached(foreignCacheKey, netForeign, 60);
+        setCached(foreignCacheKey, netForeign, 900);
       }
     }
   } catch {}

@@ -570,6 +570,9 @@ async function initRealPositionsIfEmpty() {
   }
 }
 
+const quoteCache = new Map<string, { data: any; timestamp: number }>();
+const QUOTE_CACHE_TTL_MS = 45000; // 45s TTL protects quota
+
 export async function getStrategyLabState(): Promise<StrategyLabState> {
   const marketStatus = checkIDXMarketStatus();
   await initRealPositionsIfEmpty();
@@ -582,21 +585,38 @@ export async function getStrategyLabState(): Promise<StrategyLabState> {
     const stockMap = new Map<string, TechnicalStock>();
     for (const s of liveStocks) stockMap.set(s.ticker, s);
 
-    // Fetch 0-delay real-time quote from Stockbit Zapi for active open positions
+    // Fetch 0-delay real-time quote from Stockbit Zapi for active open positions (with 45s cache)
     const sbQuoteMap = new Map<string, any>();
+    const now = Date.now();
+
     if (globalState.openPositions.length > 0) {
-      try {
-        const sbSettled = await Promise.allSettled(
-          globalState.openPositions.map(p =>
-            zpi.run("finance:stockbit", "quote", { symbol: p.ticker }).catch(() => null)
-          )
-        );
-        sbSettled.forEach((res, idx) => {
-          if (res.status === "fulfilled" && res.value && typeof res.value.last === "number") {
-            sbQuoteMap.set(globalState.openPositions[idx].ticker, res.value);
-          }
-        });
-      } catch {}
+      const neededFetches: { ticker: string; index: number }[] = [];
+
+      globalState.openPositions.forEach((p, idx) => {
+        const cached = quoteCache.get(p.ticker);
+        if (cached && now - cached.timestamp < QUOTE_CACHE_TTL_MS) {
+          sbQuoteMap.set(p.ticker, cached.data);
+        } else {
+          neededFetches.push({ ticker: p.ticker, index: idx });
+        }
+      });
+
+      if (neededFetches.length > 0) {
+        try {
+          const sbSettled = await Promise.allSettled(
+            neededFetches.map(item =>
+              zpi.run("finance:stockbit", "quote", { symbol: item.ticker }).catch(() => null)
+            )
+          );
+          sbSettled.forEach((res, idx) => {
+            if (res.status === "fulfilled" && res.value && typeof res.value.last === "number") {
+              const ticker = neededFetches[idx].ticker;
+              sbQuoteMap.set(ticker, res.value);
+              quoteCache.set(ticker, { data: res.value, timestamp: now });
+            }
+          });
+        } catch {}
+      }
     }
 
     let updatedOpenPositions = [...globalState.openPositions];

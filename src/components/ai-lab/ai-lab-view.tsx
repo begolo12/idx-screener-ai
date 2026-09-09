@@ -201,7 +201,7 @@ export function AILabView() {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         loadState();
       }
-    }, 8000);
+    }, 25000);
     return () => clearInterval(interval);
   }, []);
 
