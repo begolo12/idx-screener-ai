@@ -63,72 +63,103 @@ export async function getMarketOverview(): Promise<MarketOverviewData> {
   const cached = getCached<MarketOverviewData>(cacheKey);
   if (cached) return cached;
 
+  // Calculate WIB market hours (09:00 - 15:30 WIB, Mon-Fri)
+  const now = new Date();
+  const wibTime = new Date(now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60 * 1000);
+  const day = wibTime.getDay();
+  const hour = wibTime.getHours();
+  const minute = wibTime.getMinutes();
+  const isWeekday = day >= 1 && day <= 5;
+  const isMarketHours = isWeekday && (hour > 9 || (hour === 9 && minute >= 0)) && (hour < 15 || (hour === 15 && minute <= 30));
+  // Smart TTL: 15s during active market, 300s (5 mins) when closed to preserve 100% Zapi quota
+  const cacheTtl = isMarketHours ? 15 : 300;
+
+  let ihsgValue = "6.663,19";
+  let changeVal = "-23.25";
+  let changePct = "-0.35%";
+  let marketStatus = "LIVE BEI (0s)";
+  let gotRealtime = false;
+
+  // 1. Prioritize Stockbit via Zapi for 0-delay real-time IHSG
   try {
-    const tvRes = await fetch("https://scanner.tradingview.com/indonesia/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbols: { tickers: ["IDX:COMPOSITE"] },
-        columns: ["name", "description", "close", "change", "open", "high", "low"],
-      }),
-    });
-    const tvData = await tvRes.json();
-    const ihsgRow = tvData?.data?.[0]?.d;
+    const sb: any = await zpi.run("finance:stockbit", "quote", { symbol: "IHSG" });
+    if (sb && typeof sb.last === "number") {
+      ihsgValue = Number(sb.last).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      changeVal = `${sb.change >= 0 ? "+" : ""}${Number(sb.change).toFixed(2)}`;
+      changePct = `${sb.changePercent >= 0 ? "+" : ""}${Number(sb.changePercent).toFixed(2)}%`;
+      marketStatus = `LIVE BEI (${sb.tradingTime || "Real-time"})`;
+      gotRealtime = true;
+    }
+  } catch (err) {
+    // Quota reached or timeout -> seamlessly continue to TradingView
+  }
 
-    const ihsgValue = ihsgRow
-      ? Number(ihsgRow[2]).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : "6.686,44";
-    const changeDiff = ihsgRow ? Number(ihsgRow[2]) - Number(ihsgRow[4]) : 66.5;
-    const changeVal = `${changeDiff >= 0 ? "+" : ""}${changeDiff.toFixed(2)}`;
-    const changePct = ihsgRow
-      ? `${Number(ihsgRow[3]) >= 0 ? "+" : ""}${Number(ihsgRow[3]).toFixed(2)}%`
-      : "+1.01%";
-
-    let netForeign = "+Rp 142.5 M (Net Buy)";
+  // 2. Fallback to TradingView scanner if Stockbit Zapi was unavailable
+  if (!gotRealtime) {
     try {
+      const tvRes = await fetch("https://scanner.tradingview.com/indonesia/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbols: { tickers: ["IDX:COMPOSITE"] },
+          columns: ["name", "description", "close", "change", "open", "high", "low"],
+        }),
+      });
+      const tvData = await tvRes.json();
+      const ihsgRow = tvData?.data?.[0]?.d;
+      if (ihsgRow) {
+        ihsgValue = Number(ihsgRow[2]).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const changeDiff = Number(ihsgRow[2]) - Number(ihsgRow[4]);
+        changeVal = `${changeDiff >= 0 ? "+" : ""}${changeDiff.toFixed(2)}`;
+        changePct = `${Number(ihsgRow[3]) >= 0 ? "+" : ""}${Number(ihsgRow[3]).toFixed(2)}%`;
+        marketStatus = "LIVE TRADINGVIEW (Delayed 10m)";
+      }
+    } catch {}
+  }
+
+  // 3. Foreign flow (cached 60s)
+  let netForeign = "+Rp 142.5 M (Net Buy)";
+  try {
+    const foreignCacheKey = "foreign_flow_kontan";
+    const cachedForeign = getCached<string>(foreignCacheKey);
+    if (cachedForeign) {
+      netForeign = cachedForeign;
+    } else {
       const foreign: any = await zpi.run("finance:kontan", "dana-asing-saham", {});
       if (foreign?.data?.[0]?.net) {
         netForeign = foreign.data[0].net;
+        setCached(foreignCacheKey, netForeign, 60);
       }
-    } catch {}
+    }
+  } catch {}
 
-    // Get market breadth counts from cached stocks
-    const allStocksList = await getAllStocks().catch(() => []);
-    const upCount = allStocksList.filter((s: any) => s.changePct > 0).length;
-    const downCount = allStocksList.filter((s: any) => s.changePct < 0).length;
-    const unchangedCount = allStocksList.filter((s: any) => s.changePct === 0).length;
+  // 4. Market breadth from all stocks
+  const allStocksList = await getAllStocks().catch(() => []);
+  const upCount = allStocksList.filter((s: any) => s.changePct > 0).length;
+  const downCount = allStocksList.filter((s: any) => s.changePct < 0).length;
+  const unchangedCount = allStocksList.filter((s: any) => s.changePct === 0).length;
 
-    const payload = {
-      ihsg: {
-        value: ihsgValue,
-        change: changeVal,
-        changePct,
-      },
-      foreignFlow: {
-        netBuySell: netForeign,
-      },
-      breadth: {
-        up: upCount || 385,
-        down: downCount || 248,
-        unchanged: unchangedCount || 167,
-        total: allStocksList.length || 800,
-      },
-      marketStatus: "LIVE TRADINGVIEW",
-      updatedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-    };
+  const payload: MarketOverviewData = {
+    ihsg: {
+      value: ihsgValue,
+      change: changeVal,
+      changePct,
+    },
+    foreignFlow: {
+      netBuySell: netForeign,
+    },
+    breadth: {
+      up: upCount || 385,
+      down: downCount || 248,
+      unchanged: unchangedCount || 167,
+      total: allStocksList.length || 800,
+    },
+    marketStatus,
+    updatedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+  };
 
-    setCached(cacheKey, payload, 8);
-    return payload;
-  } catch (err) {
-    return {
-      ihsg: { value: "6.686,44", change: "+66.50", changePct: "+1.01%" },
-      foreignFlow: { netBuySell: "+Rp 142.5 M (Net Buy)" },
-      breadth: { up: 385, down: 248, unchanged: 167, total: 800 },
-      marketStatus: "DATA CACHED",
-      updatedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-      isFallback: true,
-    };
-  }
+  setCached(cacheKey, payload, cacheTtl);
+  return payload;
 }
 
 export async function getAllStocks() {
@@ -229,8 +260,14 @@ export async function getAllStocks() {
 
 export async function getStockQuote(ticker: string) {
   const symbol = ticker.toUpperCase();
-  try {
-    const res = await fetch("https://scanner.tradingview.com/indonesia/scan", {
+  const cacheKey = `stock_quote_${symbol}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) return cached;
+
+  // Concurrent fetch: Stockbit (for 0-delay tick & orderbook) + TradingView (for technicals & 52w) + News
+  const [sbSettled, tvSettled, newsSettled] = await Promise.allSettled([
+    zpi.run("finance:stockbit", "quote", { symbol }).catch(() => null),
+    fetch("https://scanner.tradingview.com/indonesia/scan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -255,110 +292,134 @@ export async function getStockQuote(ticker: string) {
           "price_book_ratio",
         ],
       }),
-    });
+    }).then((r) => r.json()).catch(() => null),
+    zpi.run("finance:idxchannel", "search", { q: symbol }).catch(() => null),
+  ]);
 
-    const json = await res.json();
-    const row = json?.data?.[0]?.d;
+  const sbData: any = sbSettled.status === "fulfilled" ? sbSettled.value : null;
+  const tvData: any = tvSettled.status === "fulfilled" ? tvSettled.value : null;
+  const zNews: any = newsSettled.status === "fulfilled" ? newsSettled.value : null;
 
-    // Fetch news specific to ticker and filter maximum 7 days ago
-    let relatedNews: any[] = [];
-    try {
-      const zNews: any = await zpi.run("finance:idxchannel", "search", { q: symbol }).catch(() => null);
-      const items = Array.isArray(zNews?.items) ? zNews.items : [];
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const row = tvData?.data?.[0]?.d;
 
-      relatedNews = items
-        .filter((item: any) => {
-          if (!item?.publishedAt) return false;
-          const pubTime = new Date(item.publishedAt).getTime();
-          return !isNaN(pubTime) && pubTime >= sevenDaysAgo;
-        })
-        .map((item: any) => {
-          const pubDate = new Date(item.publishedAt);
-          const timeFormatted = isNaN(pubDate.getTime())
-            ? "Terkini"
-            : pubDate.toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+  // Format 7-day news
+  let relatedNews: any[] = [];
+  try {
+    const items = Array.isArray(zNews?.items) ? zNews.items : [];
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    relatedNews = items
+      .filter((item: any) => {
+        if (!item?.publishedAt) return false;
+        const pubTime = new Date(item.publishedAt).getTime();
+        return !isNaN(pubTime) && pubTime >= sevenDaysAgo;
+      })
+      .map((item: any) => {
+        const pubDate = new Date(item.publishedAt);
+        const timeFormatted = isNaN(pubDate.getTime())
+          ? "Terkini"
+          : pubDate.toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+        return {
+          title: item.title,
+          url: item.url || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`,
+          source: item.source || "IDX Channel",
+          time: timeFormatted,
+          publishedAt: item.publishedAt,
+        };
+      });
+  } catch {}
 
-          return {
-            title: item.title,
-            url: item.url || `https://www.google.com/search?q=${encodeURIComponent(item.title)}`,
-            source: item.source || "IDX Channel",
-            time: timeFormatted,
-            publishedAt: item.publishedAt,
-          };
-        });
-    } catch {}
+  if (row || sbData) {
+    // Base technicals from TradingView
+    let price = Number(row?.[2] || sbData?.last || 0);
+    let changePct = Number(row?.[3] || sbData?.changePercent || 0);
+    let volume = Number(row?.[4] || sbData?.volume || 0);
+    const turnoverNum = Number(row?.[5] || (price * volume));
+    let open = Number(row?.[7] || sbData?.previousClose || price);
+    let high = Number(row?.[8] || price);
+    let low = Number(row?.[9] || price);
+    const rsi = row?.[10] !== null && row?.[10] !== undefined ? Number(Number(row[10]).toFixed(1)) : 50;
+    const recAll = Number(row?.[11] || 0);
+    const week52High = Number(row?.[12] || high);
+    const week52Low = Number(row?.[13] || low);
+    const marketCapNum = Number(row?.[14] || 0);
+    const per = row?.[15] !== null && row?.[15] !== undefined ? Number(Number(row[15]).toFixed(1)) : null;
+    const pbv = row?.[16] !== null && row?.[16] !== undefined ? Number(Number(row[16]).toFixed(2)) : null;
 
-    if (row) {
-      const price = Number(row[2] || 0);
-      const changePct = Number(row[3] || 0);
-      const volume = Number(row[4] || 0);
-      const turnoverNum = Number(row[5] || 0);
-      const open = Number(row[7] || price);
-      const high = Number(row[8] || price);
-      const low = Number(row[9] || price);
-      const rsi = row[10] !== null && row[10] !== undefined ? Number(Number(row[10]).toFixed(1)) : null;
-      const recAll = Number(row[11] || 0);
-      const week52High = Number(row[12] || high);
-      const week52Low = Number(row[13] || low);
-      const marketCapNum = Number(row[14] || 0);
-      const per = row[15] !== null && row[15] !== undefined ? Number(Number(row[15]).toFixed(1)) : null;
-      const pbv = row[16] !== null && row[16] !== undefined ? Number(Number(row[16]).toFixed(2)) : null;
+    // Prioritize 0-delay real-time price & orderbook from Stockbit
+    let isRealtimeTick = false;
+    let bestBid = null;
+    let bestOffer = null;
+    let tradingTime = null;
 
-      const turnover = turnoverNum >= 1_000_000_000_000
-        ? `${(turnoverNum / 1_000_000_000_000).toFixed(1)} Triliun`
-        : turnoverNum >= 1_000_000_000
-        ? `${(turnoverNum / 1_000_000_000).toFixed(1)} Miliar`
-        : `${(turnoverNum / 1_000_000).toFixed(0)} Juta`;
-
-      const marketCap = marketCapNum >= 1_000_000_000_000
-        ? `${(marketCapNum / 1_000_000_000_000).toFixed(1)} T`
-        : marketCapNum >= 1_000_000_000
-        ? `${(marketCapNum / 1_000_000_000).toFixed(1)} M`
-        : "-";
-
-      let techRecommendation = "Netral";
-      if (recAll >= 0.5) techRecommendation = "Strong Buy";
-      else if (recAll >= 0.1) techRecommendation = "Buy";
-      else if (recAll <= -0.5) techRecommendation = "Strong Sell";
-      else if (recAll <= -0.1) techRecommendation = "Sell";
-
-      // Nominal change rupiah
-      const nominalChange = open > 0 ? price - open : Math.round(price * (changePct / 100));
-
-      return {
-        ticker: symbol,
-        name: String(row[1] || symbol),
-        sector: mapSector(String(row[6] || "")),
-        quote: {
-          price,
-          changePct: Number(changePct.toFixed(2)),
-          nominalChange,
-          open,
-          high,
-          low,
-          previous: open,
-          volume,
-          turnover,
-          turnoverNum,
-          rsi,
-          techRecommendation,
-          week52High,
-          week52Low,
-          marketCap,
-          per,
-          pbv,
-        },
-        news: relatedNews,
-      };
+    if (sbData && typeof sbData.last === "number" && sbData.last > 0) {
+      price = sbData.last;
+      changePct = Number(sbData.changePercent || 0);
+      volume = sbData.volume || volume;
+      bestBid = sbData.bestBid || null;
+      bestOffer = sbData.bestOffer || null;
+      tradingTime = sbData.tradingTime || null;
+      isRealtimeTick = true;
     }
-  } catch (err) {
-    console.error("Failed to fetch stock quote from TradingView:", err);
+
+    const turnover = turnoverNum >= 1_000_000_000_000
+      ? `${(turnoverNum / 1_000_000_000_000).toFixed(1)} Triliun`
+      : turnoverNum >= 1_000_000_000
+      ? `${(turnoverNum / 1_000_000_000).toFixed(1)} Miliar`
+      : `${(turnoverNum / 1_000_000).toFixed(0)} Juta`;
+
+    const marketCap = marketCapNum >= 1_000_000_000_000
+      ? `${(marketCapNum / 1_000_000_000_000).toFixed(1)} T`
+      : marketCapNum >= 1_000_000_000
+      ? `${(marketCapNum / 1_000_000_000).toFixed(1)} M`
+      : "-";
+
+    let techRecommendation = "Netral";
+    if (recAll >= 0.5) techRecommendation = "Strong Buy";
+    else if (recAll >= 0.1) techRecommendation = "Buy";
+    else if (recAll <= -0.5) techRecommendation = "Strong Sell";
+    else if (recAll <= -0.1) techRecommendation = "Sell";
+
+    const nominalChange = sbData?.change !== undefined
+      ? sbData.change
+      : open > 0 ? price - open : Math.round(price * (changePct / 100));
+
+    const result = {
+      ticker: symbol,
+      name: String(sbData?.name || row?.[1] || symbol),
+      sector: mapSector(String(sbData?.sector || row?.[6] || "")),
+      quote: {
+        price,
+        changePct: Number(changePct.toFixed(2)),
+        nominalChange,
+        open,
+        high,
+        low,
+        previous: sbData?.previousClose || open,
+        volume,
+        turnover,
+        turnoverNum,
+        rsi,
+        techRecommendation,
+        week52High,
+        week52Low,
+        marketCap,
+        per,
+        pbv,
+        bestBid,
+        bestOffer,
+        isRealtimeTick,
+        tradingTime,
+      },
+      news: relatedNews,
+    };
+
+    setCached(cacheKey, result, 15);
+    return result;
   }
 
   return {

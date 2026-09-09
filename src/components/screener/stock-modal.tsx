@@ -180,6 +180,40 @@ export function StockModal({
               />
             )}
 
+            {/* Live Orderbook (Best Bid & Best Offer) from Bursa */}
+            {quote.bestBid && quote.bestOffer && (
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    Antrian Pasar (Live Orderbook)
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80">
+                    Live BEI 0s {quote.tradingTime ? `• ${quote.tradingTime}` : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-2.5">
+                    <div className="flex items-center justify-between text-[10px] text-emerald-800 font-bold mb-1">
+                      <span>BID (Beli)</span>
+                      <span>Vol: {Math.round(quote.bestBid.volume / 100).toLocaleString("id-ID")} Lot</span>
+                    </div>
+                    <div className="text-base font-black text-emerald-900 tabular-nums">
+                      Rp {quote.bestBid.price?.toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                  <div className="bg-rose-50/80 border border-rose-200 rounded-xl p-2.5">
+                    <div className="flex items-center justify-between text-[10px] text-rose-800 font-bold mb-1">
+                      <span>OFFER (Jual)</span>
+                      <span>Vol: {Math.round(quote.bestOffer.volume / 100).toLocaleString("id-ID")} Lot</span>
+                    </div>
+                    <div className="text-base font-black text-rose-900 tabular-nums">
+                      Rp {quote.bestOffer.price?.toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 52-Week Range & Technical Rating */}
             <div className="grid grid-cols-2 gap-2.5">
               <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-1">
